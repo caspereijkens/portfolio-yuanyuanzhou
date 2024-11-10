@@ -1,0 +1,9 @@
+services:
+  go-web-app:
+    restart: always
+    build:
+      dockerfile: Dockerfile
+      context: .
+    environment:
+      - VIRTUAL_HOST=yuanyuanzhou.nl
+      - LETSENCRYPT_HOST=yuanyuanzhou.nl
