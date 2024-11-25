@@ -1,9 +1,17 @@
 services:
   go-web-app:
     restart: always
+    image: portfolio:local
     build:
       dockerfile: Dockerfile
       context: .
     environment:
       - VIRTUAL_HOST=yuanyuanzhou.nl
       - LETSENCRYPT_HOST=yuanyuanzhou.nl
+    volumes:
+      - db_data:/app/data
+    ports:
+      - "8080:80"
+
+volumes:
+  db_data:

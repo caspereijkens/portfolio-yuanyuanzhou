@@ -1,0 +1,30 @@
+body {
+    background-color: #fffeec;
+}
+
+.pdf-container {
+    max-width: 1800px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 20px;
+    box-sizing: border-box;
+}
+.pdf-page {
+    margin-bottom: 40px;
+    background: white;
+}
+.canvas-container {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+canvas {
+    max-width: 100%;
+    height: auto !important;
+}
+#loading {
+    text-align: center;
+    padding: 20px;
+    display: none;
+    color: #666;
+}
