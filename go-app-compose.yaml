@@ -10,7 +10,7 @@ services:
       - LETSENCRYPT_HOST=yuanyuanzhou.nl
       - SERVER_PORT=80
     volumes:
-      - db_data:/app/data
+      - data:/app/data
     ports:
       - "8080:80"
 
