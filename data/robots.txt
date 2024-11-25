@@ -1,0 +1,6 @@
+# Notice: Collection of data on this site through automated means is
+# prohibited unless you have express written permission from the
+# administrator and may only be conducted for the limited purpose
+# contained in said permission.
+User-agent: *
+Disallow: /

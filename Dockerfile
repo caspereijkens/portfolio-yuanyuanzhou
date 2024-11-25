@@ -1,14 +1,47 @@
-FROM golang:alpine AS build
-RUN apk --no-cache add gcc g++ make git
-WORKDIR /go/src/app
-COPY . .
-RUN go mod init webserver
-RUN go mod tidy
-RUN GOOS=linux go build -ldflags="-s -w" -o ./bin/web-app ./main.go
+# =============================================================================
+#  Multi-stage Dockerfile
+# =============================================================================
+#  Usage:
+#    docker build -t portfolio:local . && docker run --rm portfolio:local
+# =============================================================================
 
-FROM alpine:3.13
-RUN apk --no-cache add ca-certificates
-WORKDIR /usr/bin
-COPY --from=build /go/src/app/bin /go/bin
+# -----------------------------------------------------------------------------
+#  Build Stage
+# -----------------------------------------------------------------------------
+FROM golang:alpine3.18 AS build
+
+ENV CGO_ENABLED=1
+
+RUN apk add --no-cache \
+    gcc  \
+    g++  \
+    make \
+    git  \
+    musl-dev
+
+WORKDIR /workspace
+
+COPY . /workspace/
+
+RUN \
+    go mod init webserver && \
+    go mod tidy
+RUN \
+    GOOS=linux go build -ldflags="-s -w" -o ./bin/web-app ./main.go
+
+# -----------------------------------------------------------------------------
+#  Main Stage
+# -----------------------------------------------------------------------------
+FROM alpine:3.18
+
+RUN apk add --no-cache ca-certificates
+
+WORKDIR /app
+
+COPY --from=build /workspace/bin/web-app /usr/local/bin/web-app
+COPY --from=build /workspace/static ./static/
+COPY --from=build /workspace/robots.txt ./robots.txt
+
+ENV SERVER_PORT=80
 EXPOSE 80
-ENTRYPOINT /go/bin/web-app --port 80
+ENTRYPOINT ["/usr/local/bin/web-app", "--port 80"]
