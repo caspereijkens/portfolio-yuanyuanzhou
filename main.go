@@ -321,9 +321,9 @@ func splitPDFByPage(inputPath string, outputDir string) error {
 func determinePort() string {
 	port, ok := os.LookupEnv("SERVER_PORT")
 	if !ok {
-		port = ":8080"
+		port = "8080"
 	}
-	return port
+	return ":" + port
 }
 
 func configDatabase() error {
