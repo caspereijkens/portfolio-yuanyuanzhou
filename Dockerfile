@@ -40,7 +40,7 @@ WORKDIR /app
 
 COPY --from=build /workspace/bin/web-app /usr/local/bin/web-app
 COPY --from=build /workspace/static ./static/
-COPY --from=build /workspace/robots.txt ./robots.txt
+COPY --from=build /workspace/data ./data/
 
 ENV SERVER_PORT=80
 EXPOSE 80
