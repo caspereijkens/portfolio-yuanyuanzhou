@@ -12,6 +12,8 @@ services:
       - "/etc/nginx/certs"
 
   letsencrypt-nginx-proxy-companion:
+    environment:
+      - LETSENCRYPT_TEST=true
     restart: always
     image: jrcs/letsencrypt-nginx-proxy-companion
     volumes:
