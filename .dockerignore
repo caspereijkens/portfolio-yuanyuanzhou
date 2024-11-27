@@ -1,3 +1,4 @@
 go.mod
 archive
 sqlite.DB
+go.sum
