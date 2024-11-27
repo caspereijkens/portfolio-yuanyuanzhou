@@ -10,7 +10,7 @@ services:
       - "/usr/share/nginx/html"
       - "/var/run/docker.sock:/tmp/docker.sock:ro"
       - "/etc/nginx/certs"
-      - "./nginx.conf:/etc/nginx/vhost.d/default"
+      - "./nginx.conf:/etc/nginx/conf.d/default.conf"
 
   letsencrypt-nginx-proxy-companion:
     restart: always
