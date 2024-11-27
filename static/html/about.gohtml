@@ -1,12 +1,10 @@
 <!doctype html>
 <html lang="en">
-    {{ template "head" "Yuanyuan Zhou Works" }}
+    {{ template "head" "Yuanyuan Zhou About" }}
     <body>
         {{template "navbar" .Login }}
         <h1>About</h1>
-        <p>
-            {{ template "about.content" }}
-        </p>
+        <pre>{{ .Content }}</pre>
         <hr>
     </body>
 </html>
