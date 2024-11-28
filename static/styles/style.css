@@ -1,27 +1,30 @@
 body {
-    background-color: #fffeec;
+    background-color: #ffffff; /* Set to white for simplicity */
+    margin: 0;
+    padding: 0;
 }
 
 .pdf-container {
-    max-width: 1800px;
-    width: 100%;
-    margin: 0 auto;
-    padding: 20px;
-    box-sizing: border-box;
+    width: 100%; /* Make the container span the full width */
+    margin: 0; /* Remove any outer margins */
+    padding: 0; /* Remove inner padding */
+    box-sizing: border-box; /* Ensure consistent sizing */
 }
+
 .pdf-page {
-    margin-bottom: 40px;
-    background: white;
+    margin: 0; /* Remove margins between pages */
 }
+
 .canvas-container {
-    display: flex;
-    justify-content: center;
-    width: 100%;
+    width: 100%; /* Make canvas span the full width */
+    overflow: hidden; /* Prevent content spillover */
 }
+
 canvas {
-    max-width: 100%;
-    height: auto !important;
+    width: 100%; /* Ensure canvas fits container */
+    height: auto; /* Maintain aspect ratio */
 }
+
 #loading {
     text-align: center;
     padding: 20px;

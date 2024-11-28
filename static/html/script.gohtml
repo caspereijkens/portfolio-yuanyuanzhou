@@ -8,18 +8,18 @@
     let loading = false;
     let hasMore = true;
 
-    async function renderPDF(url, container) {
+    async function renderPDF(url, container, zoomLevel = 1) {
         try {
             const loadingTask = pdfjsLib.getDocument(url);
             const pdf = await loadingTask.promise;
 
-            // Get the first page (since each PDF is a single page)
+            // Get the first page (assuming a single-page PDF for this example)
             const page = await pdf.getPage(1);
 
             // Calculate desired width and height
             const viewport = page.getViewport({ scale: 1 });
             const containerWidth = container.clientWidth;
-            const scale = containerWidth / viewport.width;
+            const scale = Math.max(1, (containerWidth / viewport.width) * zoomLevel);
             const scaledViewport = page.getViewport({ scale });
 
             // Create canvas and context
@@ -46,37 +46,34 @@
         }
     }
 
-    async function loadMorePages() {
+    async function loadBatchPages(batchSize = 5) {
         if (loading || !hasMore) return;
 
         loading = true;
         document.getElementById("loading").style.display = "block";
 
         try {
-            const response = await fetch(
-                `/api/pages?page=${currentPage}`,
-            );
-            if (response.status === 204) {
-                hasMore = false;
-                document.getElementById("loading").style.display =
-                    "none";
-                return;
+            for (let i = 0; i < batchSize; i++) {
+                const response = await fetch(`/api/pages?page=${currentPage}`);
+                if (response.status === 204) {
+                    hasMore = false;
+                    break;
+                }
+
+                const pages = await response.json();
+
+                for (const page of pages) {
+                    const pageDiv = document.createElement("div");
+                    pageDiv.className = "pdf-page";
+                    pageDiv.dataset.pdfPath = page.path;
+                    document.getElementById("pdfContainer").appendChild(pageDiv);
+
+                    // Lazy-load PDF rendering
+                    observer.observe(pageDiv);
+                }
+
+                currentPage++;
             }
-
-            const pages = await response.json();
-
-            for (const page of pages) {
-                const pageDiv = document.createElement("div");
-                pageDiv.className = "pdf-page";
-                document
-                    .getElementById("pdfContainer")
-                    .appendChild(pageDiv);
-
-                // Render PDF page
-                await renderPDF(page.path, pageDiv);
-            }
-
-            currentPage++;
         } catch (error) {
             console.error("Error loading pages:", error);
         } finally {
@@ -85,15 +82,15 @@
         }
     }
 
-    // Improved scroll detection
+    // Scroll detection with debounce
     function isNearBottom() {
+        const scrollBuffer = 300; // Adjust buffer for triggering load
         return (
             window.innerHeight + window.scrollY >=
-            document.body.offsetHeight - 1500
+            document.body.offsetHeight - scrollBuffer
         );
     }
 
-    // Debounce function
     function debounce(func, wait) {
         let timeout;
         return function executedFunction(...args) {
@@ -106,25 +103,53 @@
         };
     }
 
+    // Lazy loading using Intersection Observer
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+                const pageDiv = entry.target;
+                renderPDF(pageDiv.dataset.pdfPath, pageDiv);
+                observer.unobserve(pageDiv);
+            }
+        });
+    });
+
     // Initial load
-    loadMorePages();
+    loadBatchPages();
 
     // Infinite scroll with debounce
     window.addEventListener(
         "scroll",
         debounce(() => {
             if (isNearBottom()) {
-                loadMorePages();
+                loadBatchPages();
             }
         }, 100),
     );
 
-    // Handle window resize
+    // Resize handler without reload
     window.addEventListener(
         "resize",
         debounce(() => {
-            // Reload current pages with new dimensions
-            location.reload();
+            const pdfPages = document.querySelectorAll(".pdf-page");
+            pdfPages.forEach((pageDiv) => {
+                const canvas = pageDiv.querySelector("canvas");
+                if (canvas) {
+                    const containerWidth = pageDiv.clientWidth;
+                    const viewport = pageDiv.viewport;
+                    const scale = containerWidth / viewport.width;
+                    const scaledViewport = viewport.clone({ scale });
+
+                    // Re-render the canvas
+                    const context = canvas.getContext("2d");
+                    canvas.width = scaledViewport.width;
+                    canvas.height = scaledViewport.height;
+                    page.render({
+                        canvasContext: context,
+                        viewport: scaledViewport,
+                    }).promise;
+                }
+            });
         }, 250),
     );
 </script>
