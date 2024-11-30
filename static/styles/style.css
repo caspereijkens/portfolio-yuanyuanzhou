@@ -1,33 +1,21 @@
 body {
-    background-color: #ffffff; /* Set to white for simplicity */
     margin: 0;
     padding: 0;
+    font-family: Arial, sans-serif;
 }
-
-.pdf-container {
-    width: 100%; /* Make the container span the full width */
-    margin: 0; /* Remove any outer margins */
-    padding: 0; /* Remove inner padding */
-    box-sizing: border-box; /* Ensure consistent sizing */
+#pdfContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
 }
-
-.pdf-page {
-    margin: 0; /* Remove margins between pages */
+.page {
+    width: 100%; /* Full width for the container */
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
 }
-
-.canvas-container {
-    width: 100%; /* Make canvas span the full width */
-    overflow: hidden; /* Prevent content spillover */
-}
-
 canvas {
-    width: 100%; /* Ensure canvas fits container */
+    max-width: 100%;
     height: auto; /* Maintain aspect ratio */
-}
-
-#loading {
-    text-align: center;
-    padding: 20px;
-    display: none;
-    color: #666;
 }

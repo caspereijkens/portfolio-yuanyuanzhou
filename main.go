@@ -9,15 +9,10 @@ import (
 	"log"
 	"mime/multipart"
 	"os"
-	"strconv"
 	"time"
 
-	"encoding/json"
 	"net/http"
-	"sort"
-	"strings"
 
-	"github.com/pdfcpu/pdfcpu/pkg/api"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
 
@@ -65,63 +60,6 @@ func mainPageHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "error templating page", http.StatusInternalServerError)
 	}
-}
-
-func pageHandler(w http.ResponseWriter, r *http.Request) {
-	pageStr := r.URL.Query().Get("page")
-	page, err := strconv.Atoi(pageStr)
-	if err != nil {
-		page = 0
-	}
-
-	pageSize := 2 // Number of PDF pages to load at once
-
-	files, err := os.ReadDir("data/pdf")
-	if err != nil {
-		http.Error(w, "Failed to read directory", http.StatusInternalServerError)
-		return
-	}
-
-	// Filter and sort PDF files
-	var pdfFiles []string
-	for _, file := range files {
-		if strings.HasSuffix(file.Name(), ".pdf") {
-			pdfFiles = append(pdfFiles, file.Name())
-		}
-	}
-
-	// Sort files numerically instead of lexicographically
-	sort.Slice(pdfFiles, func(i, j int) bool {
-		// Extract numbers from filenames and compare
-		numI := extractNumber(pdfFiles[i])
-		numJ := extractNumber(pdfFiles[j])
-		return numI < numJ
-	})
-
-	// Calculate pagination
-	start := page * pageSize
-	end := start + pageSize
-	if end > len(pdfFiles) {
-		end = len(pdfFiles)
-	}
-
-	if start >= len(pdfFiles) {
-		// No more pages
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-
-	// Prepare response
-	var pages []PageInfo
-	for i, file := range pdfFiles[start:end] {
-		pages = append(pages, PageInfo{
-			PageNum: start + i + 1,
-			Path:    fmt.Sprintf("/pdf/%s?t=%d", file, time.Now().Unix()),
-		})
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(pages)
 }
 
 func loginHandler(w http.ResponseWriter, req *http.Request) {
@@ -173,77 +111,78 @@ func styleSheetHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "static/styles/style.css")
 }
 
-func robotsHandler(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "data/robots.txt")
-}
-
 func aboutHandler(w http.ResponseWriter, r *http.Request) {
 	_, loggedIn := getLoginStatus(r)
 
 	if r.Method == http.MethodPost {
 		if !loggedIn {
-			http.Error(w, "forbidden to do post request", http.StatusForbidden)
+			http.Error(w, "Unauthorized: You must be logged in to update this page.", http.StatusForbidden)
 			return
 		}
 
 		err := r.ParseForm()
 		if err != nil {
-			log.Printf("aboutHandler: failed to parse form data: %v", err)
-			http.Error(w, "error parsing form data", http.StatusInternalServerError)
+			http.Error(w, "Unable to parse form data.", http.StatusBadRequest)
 			return
 		}
-
-		file, err := os.OpenFile("data/about.txt", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-		if err != nil {
-			log.Printf("aboutHandler: failed to open about content for writing: %v", err)
-			http.Error(w, "error storing file object", http.StatusInternalServerError)
-			return
-		}
-		defer file.Close()
 
 		content := r.FormValue("content")
-
-		_, err = file.WriteString(content)
-		if err != nil {
-			log.Printf("aboutHandler: failed to write content to file: %v", err)
-			http.Error(w, "error writing content", http.StatusInternalServerError)
+		if len(content) > 1000 {
+			http.Error(w, "Content is too long.", http.StatusBadRequest)
 			return
 		}
-	}
-	content, err := os.ReadFile("data/about.txt")
-	if err != nil {
-		http.Error(w, "error reading about contents", http.StatusInternalServerError)
+
+		err = os.WriteFile("data/serve/about.txt", []byte(content), 0644)
+		if err != nil {
+			log.Printf("Failed to write to file: %v", err)
+			http.Error(w, "Failed to save content.", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/about", http.StatusSeeOther)
 		return
-	}
-	data := aboutData{
-		Login:   loggedIn,
-		Content: string(content),
 	}
 
-	err = TPL.ExecuteTemplate(w, "about.gohtml", data)
+	err := TPL.ExecuteTemplate(w, "about.gohtml", loginData{Login: loggedIn})
 	if err != nil {
-		http.Error(w, "error templating about page", http.StatusInternalServerError)
-		return
+		http.Error(w, "Failed to render template.", http.StatusInternalServerError)
 	}
 }
 
 func contactHandler(w http.ResponseWriter, r *http.Request) {
-	err := TPL.ExecuteTemplate(w, "contact.gohtml", nil)
-	if err != nil {
-		http.Error(w, "error templating contact page", http.StatusInternalServerError)
+	_, loggedIn := getLoginStatus(r)
+
+	if r.Method == http.MethodPost {
+		if !loggedIn {
+			http.Error(w, "Unauthorized: You must be logged in to update this page.", http.StatusForbidden)
+			return
+		}
+
+		err := r.ParseForm()
+		if err != nil {
+			http.Error(w, "Unable to parse form data.", http.StatusBadRequest)
+			return
+		}
+
+		content := r.FormValue("content")
+		if len(content) > 1000 {
+			http.Error(w, "Content is too long.", http.StatusBadRequest)
+			return
+		}
+
+		err = os.WriteFile("data/serve/contact.txt", []byte(content), 0644)
+		if err != nil {
+			log.Printf("Failed to write to file: %v", err)
+			http.Error(w, "Failed to save content.", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/contact", http.StatusSeeOther)
+		return
 	}
-}
 
-func noCacheFileServer(dir string) http.Handler {
-	fileServer := http.FileServer(http.Dir(dir))
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Set cache control headers
-		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		w.Header().Set("Pragma", "no-cache")
-		w.Header().Set("Expires", "0")
-
-		fileServer.ServeHTTP(w, r)
-	})
+	err := TPL.ExecuteTemplate(w, "contact.gohtml", loginData{Login: loggedIn})
+	if err != nil {
+		http.Error(w, "Failed to render template.", http.StatusInternalServerError)
+	}
 }
 
 func main() {
@@ -260,17 +199,18 @@ func main() {
 		log.Fatalf("Failed to start database: %v", err)
 	}
 
+	fileHandler := http.StripPrefix("/blob/", http.FileServer(http.Dir("data/serve")))
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", mainPageHandler)
-	mux.HandleFunc("/api/pages", pageHandler)
-	mux.Handle("/pdf/", http.StripPrefix("/pdf/", noCacheFileServer("data/pdf")))
 	mux.HandleFunc("/login", loginHandler)
 	mux.HandleFunc("/logout", logoutHandler)
 	mux.HandleFunc("/upload", uploadHandler)
+	mux.Handle("/blob/", fileHandler)
 	mux.HandleFunc("/about", aboutHandler)
 	mux.HandleFunc("/contact", contactHandler)
 	mux.Handle("/favicon.ico", http.NotFoundHandler())
-	mux.HandleFunc("/robots.txt", robotsHandler)
+	mux.Handle("/robots.txt", AddPrefixHandler("/blob", fileHandler))
 	mux.HandleFunc("/style.css", styleSheetHandler)
 
 	srv := &http.Server{
@@ -283,39 +223,11 @@ func main() {
 	log.Fatal(srv.ListenAndServe())
 }
 
-// Helper function to extract number from filename
-func extractNumber(filename string) int {
-	// Assuming filename format like "something_1.pdf"
-	parts := strings.Split(filename, "_")
-	if len(parts) < 2 {
-		return 0
-	}
-	numStr := strings.TrimSuffix(parts[len(parts)-1], ".pdf")
-	num, err := strconv.Atoi(numStr)
-	if err != nil {
-		return 0
-	}
-	return num
-}
-
-func splitPDFByPage(inputPath string, outputDir string) error {
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return fmt.Errorf("failed to create output directory: %v", err)
-	}
-
-	pageCount, err := api.PageCountFile(inputPath)
-	if err != nil {
-		return fmt.Errorf("failed to get page count: %v", err)
-	}
-	if pageCount == 0 {
-		return fmt.Errorf("PDF has no pages")
-	}
-
-	if err := api.SplitFile(inputPath, outputDir, 1, nil); err != nil {
-		return fmt.Errorf("failed to split into single pages: %v", err)
-	}
-
-	return nil
+func AddPrefixHandler(prefix string, h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.URL.Path = prefix + r.URL.Path
+		h.ServeHTTP(w, r)
+	})
 }
 
 func determinePort() string {
@@ -466,7 +378,7 @@ func storeFiles(r *http.Request) error {
 		}
 
 		if mimeType == "application/pdf" {
-			err = storePDF(parsedFile)
+			err = store("data/portfolio.pdf", parsedFile)
 		}
 	}
 	return nil
@@ -484,31 +396,5 @@ func store(filePath string, parsedFile multipart.File) error {
 	if err != nil {
 		return fmt.Errorf("storeFiles: error writing to local file: %v", err)
 	}
-	return nil
-}
-
-func storePDF(parsedFile multipart.File) error {
-	tempDir, err := os.MkdirTemp(localBlobDir, "")
-	if err != nil {
-		return fmt.Errorf("storePDF: error creating a new temporary directory: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	tempFile := tempDir + "/file.pdf"
-	err = store(tempFile, parsedFile)
-	if err != nil {
-		return fmt.Errorf("storePDF: error storing PDF: %v", err)
-	}
-
-	err = os.RemoveAll(localBlobDir + "pdf")
-	if err != nil {
-		return fmt.Errorf("storePDF: error removing path '%s': %v", localBlobDir+"pdf", err)
-	}
-
-	err = splitPDFByPage(tempFile, localBlobDir+"pdf")
-	if err != nil {
-		return fmt.Errorf("storePDF: error storing PDF: %v", err)
-	}
-
 	return nil
 }
