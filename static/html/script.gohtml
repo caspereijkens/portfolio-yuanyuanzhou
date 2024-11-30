@@ -1,131 +1,37 @@
 {{ define "script" }}
 <script>
-    // Set PDF.js workerSrc
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    let currentPage = 0;
-    let loading = false;
-    let hasMore = true;
+    pdfjsLib.getDocument('/blob/portfolio.pdf').promise.then(pdf => {
+        const container = document.getElementById('pdfContainer');
 
-    async function renderPDF(url, container) {
-        try {
-            const loadingTask = pdfjsLib.getDocument(url);
-            const pdf = await loadingTask.promise;
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            const div = document.createElement('div');
+            div.className = 'page';
+            const canvas = document.createElement('canvas');
+            div.appendChild(canvas);
+            container.appendChild(div);
 
-            // Get the first page (since each PDF is a single page)
-            const page = await pdf.getPage(1);
+            pdf.getPage(pageNum).then(page => {
+                const viewport = page.getViewport({ scale: 1 }); // Default scale for aspect ratio
+                const containerWidth = container.clientWidth; // Get container width
+                const scale = containerWidth / viewport.width; // Calculate scale for fit
+                const scaledViewport = page.getViewport({ scale });
 
-            // Calculate desired width and height
-            const viewport = page.getViewport({ scale: 1 });
-            const containerWidth = container.clientWidth;
-            const scale = containerWidth / viewport.width;
-            const scaledViewport = page.getViewport({ scale });
+                // Set canvas dimensions
+                canvas.width = scaledViewport.width * window.devicePixelRatio;
+                canvas.height = scaledViewport.height * window.devicePixelRatio;
 
-            // Create canvas and context
-            const canvas = document.createElement("canvas");
-            const context = canvas.getContext("2d");
-            canvas.width = scaledViewport.width;
-            canvas.height = scaledViewport.height;
+                // Scale context for high resolution
+                const context = canvas.getContext('2d');
+                context.scale(window.devicePixelRatio, window.devicePixelRatio);
 
-            // Create wrapper for canvas
-            const canvasWrapper = document.createElement("div");
-            canvasWrapper.className = "canvas-container";
-            canvasWrapper.appendChild(canvas);
-            container.appendChild(canvasWrapper);
-
-            // Render PDF page
-            await page.render({
-                canvasContext: context,
-                viewport: scaledViewport,
-            }).promise;
-        } catch (error) {
-            console.error("Error rendering PDF:", error);
-            container.innerHTML =
-                '<p style="color: red; text-align: center;">Error loading PDF</p>';
+                page.render({
+                    canvasContext: context,
+                    viewport: scaledViewport
+                });
+            });
         }
-    }
-
-    async function loadMorePages() {
-        if (loading || !hasMore) return;
-
-        loading = true;
-        document.getElementById("loading").style.display = "block";
-
-        try {
-            const response = await fetch(
-                `/api/pages?page=${currentPage}`,
-            );
-            if (response.status === 204) {
-                hasMore = false;
-                document.getElementById("loading").style.display =
-                    "none";
-                return;
-            }
-
-            const pages = await response.json();
-
-            for (const page of pages) {
-                const pageDiv = document.createElement("div");
-                pageDiv.className = "pdf-page";
-                document
-                    .getElementById("pdfContainer")
-                    .appendChild(pageDiv);
-
-                // Render PDF page
-                await renderPDF(page.path, pageDiv);
-            }
-
-            currentPage++;
-        } catch (error) {
-            console.error("Error loading pages:", error);
-        } finally {
-            loading = false;
-            document.getElementById("loading").style.display = "none";
-        }
-    }
-
-    // Improved scroll detection
-    function isNearBottom() {
-        return (
-            window.innerHeight + window.scrollY >=
-            document.body.offsetHeight - 1500
-        );
-    }
-
-    // Debounce function
-    function debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    }
-
-    // Initial load
-    loadMorePages();
-
-    // Infinite scroll with debounce
-    window.addEventListener(
-        "scroll",
-        debounce(() => {
-            if (isNearBottom()) {
-                loadMorePages();
-            }
-        }, 100),
-    );
-
-    // Handle window resize
-    window.addEventListener(
-        "resize",
-        debounce(() => {
-            // Reload current pages with new dimensions
-            location.reload();
-        }, 250),
-    );
+    });
 </script>
 {{ end }}

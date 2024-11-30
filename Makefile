@@ -7,7 +7,7 @@ PROXY_COMPOSE_FILE = nginx-proxy-compose.yaml
 APP_COMPOSE_FILE = go-app-compose.yaml
 
 # Commands
-.PHONY: all build push clean deploy down help
+.PHONY: all build push clean deploy undeploy help
 
 # Default command to show help
 all: help
@@ -41,7 +41,7 @@ deploy:
 	docker-compose -f $(APP_COMPOSE_FILE) up -d
 
 # Take down the application using docker-compose
-down:
+undeploy:
 	@echo "Taking down the application with docker-compose"
 	docker-compose -f $(APP_COMPOSE_FILE) down
 	docker-compose -f $(PROXY_COMPOSE_FILE) down
@@ -53,7 +53,7 @@ help:
 	@echo "  push         - Build, tag as 'latest', and push the image to Docker Hub"
 	@echo "  clean        - Remove the local Docker images"
 	@echo "  deploy       - Deploy the application using docker-compose"
-	@echo "  down         - Take down the application using docker-compose"
+	@echo "  undeploy     - Take down the application using docker-compose"
 	@echo "  help         - Show this help message"
 	@echo ""
 	@echo "You can set the VERSION variable when calling make:"
