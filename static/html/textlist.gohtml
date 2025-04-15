@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+{{ template "head" "Yuanyuan Zhou Text" }}
+    <body>
+    {{template "navbar" .Login }}
+    {{if .Login}}
+        <div class="text-form">
+            <h2>Add New Text</h2>
+            <form action="/text" method="POST">
+                <div>
+                    <input type="text" name="title" placeholder="Title" required>
+                </div>
+
+                <div>
+                    <textarea name="content" rows="5" placeholder="Your text content..." required></textarea>
+                </div>
+
+                <div>
+                    <button type="submit">Submit</button>
+                </div>
+            </form>
+        </div>
+    {{end}}
+
+    <h1>Texts</h1>
+    {{range .Texts}}
+        <article>
+            <a href="/text/{{ .ID }}"><h2>{{ .Timestamp.Format "2006-01-02"}} - {{.Title}}</h2></a>
+        </article>
+        <hr>
+    {{end}}
+</body>
+</html>
