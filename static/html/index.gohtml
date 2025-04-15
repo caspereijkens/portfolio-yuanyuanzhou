@@ -1,9 +1,32 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-{{ template "head" "Yuanyuan Zhou Works" }}
+{{ template "head" "Yuanyuan Zhou" }}
 <body>
-    {{template "navbar" .Login }}
-    <div id="pdfContainer"></div>
-    {{ template "script" }}
+    {{template "navbar" .Login}}
+    <div class="container">
+        <h1>Yuanyuan Zhou</h1>
+
+        <div class="image-container">
+            <img id="profile-image" src="/blob/profile.jpg" alt="Profile Image"
+                    style="max-width: 100%; max-height: 80vh; display: block; margin: 0 auto;">
+        </div>
+
+
+        {{ if .Login }}
+        <hr>
+        <div class="admin-section">
+            <h2>Update Content</h2>
+
+            <form method="POST" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="image">Profile Image:</label>
+                    <input type="file" name="image" accept="image/jpeg,image/png,image/heic" capture="environment">
+                </div>
+
+                <button type="submit" class="btn">Update</button>
+            </form>
+        </div>
+        {{ end }}
+    </div>
 </body>
 </html>

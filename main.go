@@ -9,6 +9,8 @@ import (
 	"log"
 	"mime/multipart"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"net/http"
@@ -36,6 +38,14 @@ type User struct {
 	PasswordDigest []byte
 }
 
+type Text struct {
+	ID        int
+	UserID    int
+	Title     string
+	Content   string
+	Timestamp *time.Time
+}
+
 type loginData struct {
 	Login bool
 }
@@ -43,6 +53,16 @@ type loginData struct {
 type aboutData struct {
 	Login   bool
 	Content string
+}
+
+type listTextData struct {
+	Login bool
+	Texts []Text
+}
+
+type viewTextData struct {
+	Login bool
+	Text  Text
 }
 
 var allowedMIMETypes = map[string]bool{
@@ -54,11 +74,205 @@ func mainPageHandler(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+
 	_, loggedIn := getLoginStatus(r)
+
+	if r.Method == http.MethodPost {
+		if !loggedIn {
+			http.Error(w, "Unauthorized", http.StatusForbidden)
+			return
+		}
+
+		// Parse multipart form (for file uploads)
+		err := r.ParseMultipartForm(10 << 20) // 10 MB max
+		if err != nil {
+			http.Error(w, "Unable to parse form", http.StatusBadRequest)
+			return
+		}
+
+		// Handle image upload
+		file, _, err := r.FormFile("image")
+		if err == nil { // File was uploaded
+			defer file.Close()
+
+			// Read the first 512 bytes to detect content type
+			buffer := make([]byte, 512)
+			_, err = file.Read(buffer)
+			if err != nil {
+				http.Error(w, "Failed to read image", http.StatusInternalServerError)
+				return
+			}
+
+			// Reset file pointer
+			_, err = file.Seek(0, 0)
+			if err != nil {
+				http.Error(w, "Failed to process image", http.StatusInternalServerError)
+				return
+			}
+
+			contentType := http.DetectContentType(buffer)
+			allowedTypes := map[string]bool{
+				"image/jpeg": true,
+				"image/png":  true,
+				"image/heic": true, // HEIC support would need conversion
+			}
+
+			if !allowedTypes[contentType] {
+				http.Error(w, "Unsupported image format", http.StatusBadRequest)
+				return
+			}
+
+			// Convert HEIC to JPEG if needed (would need external library)
+			if contentType == "image/heic" {
+				// You would need a HEIC decoder library here
+				// For example: https://github.com/strukturag/libheif
+				http.Error(w, "HEIC conversion not implemented", http.StatusNotImplemented)
+				return
+			}
+
+			// Create the file
+			dst, err := os.Create("data/serve/profile.jpg")
+			if err != nil {
+				http.Error(w, "Failed to save image", http.StatusInternalServerError)
+				return
+			}
+			defer dst.Close()
+
+			// Copy the uploaded file to the destination
+			if _, err := io.Copy(dst, file); err != nil {
+				http.Error(w, "Failed to save image", http.StatusInternalServerError)
+				return
+			}
+		} else if !errors.Is(err, http.ErrMissingFile) {
+			// Only log if error is something other than "no file uploaded"
+			log.Printf("Error processing image upload: %v", err)
+		}
+
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
 
 	err := TPL.ExecuteTemplate(w, "index.gohtml", loginData{Login: loggedIn})
 	if err != nil {
+		http.Error(w, "Failed to render template", http.StatusInternalServerError)
+	}
+}
+
+func portfolioHandler(w http.ResponseWriter, r *http.Request) {
+	_, loggedIn := getLoginStatus(r)
+
+	if r.Method == http.MethodPost {
+		if !loggedIn {
+			http.Error(w, "Unauthorized", http.StatusForbidden)
+			return
+		}
+		err := storeFiles(r)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, "error storing file object ", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	err := TPL.ExecuteTemplate(w, "portfolio.gohtml", loginData{Login: loggedIn})
+	if err != nil {
 		http.Error(w, "error templating page", http.StatusInternalServerError)
+	}
+}
+
+func listTextHandler(w http.ResponseWriter, req *http.Request) {
+	userID, loggedIn := getLoginStatus(req)
+
+	if req.Method == http.MethodPost {
+		if !loggedIn {
+			http.Error(w, "Unauthorized", http.StatusForbidden)
+			return
+		}
+
+		err := req.ParseForm()
+		if err != nil {
+			http.Error(w, "Unable to parse form data.", http.StatusBadRequest)
+			return
+		}
+
+		text := Text{
+			UserID:  *userID,
+			Title:   req.FormValue("title"),
+			Content: req.FormValue("content"),
+		}
+		err = insertText(text)
+		if err != nil {
+			http.Error(w, "Failed to save text", http.StatusInternalServerError)
+			log.Printf("Error inserting text: %v", err)
+			return
+		}
+	}
+
+	texts, err := getTexts()
+	if err != nil {
+		http.Error(w, "Failed to retrieve texts", http.StatusInternalServerError)
+		log.Printf("Error retrieving texts: %v", err)
+		return
+	}
+
+	err = TPL.ExecuteTemplate(w, "textlist.gohtml", listTextData{Login: loggedIn, Texts: texts})
+	if err != nil {
+		http.Error(w, "Template error", http.StatusInternalServerError)
+	}
+}
+
+func viewTextHandler(w http.ResponseWriter, req *http.Request) {
+	idStr := strings.TrimPrefix(req.URL.Path, "/text/")
+
+	if idStr == "" {
+		listTextHandler(w, req)
+		return
+	}
+
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid post ID - must be an integer", http.StatusBadRequest)
+		return
+	}
+
+	texts, err := getTexts(id)
+	if err != nil {
+		http.Error(w, "Failed to retrieve texts", http.StatusInternalServerError)
+		log.Printf("Error retrieving texts: %v", err)
+		return
+	}
+
+	text := texts[0]
+	_, loggedIn := getLoginStatus(req)
+
+	if req.Method == http.MethodPost {
+		if !loggedIn {
+			http.Error(w, "Unauthorized", http.StatusForbidden)
+			return
+		}
+
+		err := req.ParseForm()
+		if err != nil {
+			http.Error(w, "Unable to parse form data.", http.StatusBadRequest)
+			return
+		}
+
+		text.Title = req.FormValue("title")
+		text.Content = req.FormValue("content")
+
+		err = updateText(text)
+		if err != nil {
+			http.Error(w, "Failed to save text", http.StatusInternalServerError)
+			log.Printf("Error inserting text: %v", err)
+			return
+		}
+	}
+
+	err = TPL.ExecuteTemplate(w, "text.gohtml", viewTextData{Login: loggedIn, Text: text})
+	if err != nil {
+		http.Error(w, "Template error", http.StatusInternalServerError)
 	}
 }
 
@@ -84,12 +298,6 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
-	_, loggedIn := getLoginStatus(r)
-	if !loggedIn {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
 	if r.Method == http.MethodPost {
 		err := storeFiles(r)
 		if err != nil {
@@ -101,6 +309,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	_, loggedIn := getLoginStatus(r)
 	err := TPL.ExecuteTemplate(w, "upload.gohtml", loginData{Login: loggedIn})
 	if err != nil {
 		http.Error(w, "error templating page", http.StatusInternalServerError)
@@ -111,77 +320,52 @@ func styleSheetHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "static/styles/style.css")
 }
 
-func aboutHandler(w http.ResponseWriter, r *http.Request) {
-	_, loggedIn := getLoginStatus(r)
+func contentHandler(templateName, contentFile string) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		_, loggedIn := getLoginStatus(req)
 
-	if r.Method == http.MethodPost {
-		if !loggedIn {
-			http.Error(w, "Unauthorized: You must be logged in to update this page.", http.StatusForbidden)
+		if req.Method == http.MethodPost {
+			if !loggedIn {
+				http.Error(w, "Unauthorized", http.StatusForbidden)
+				return
+			}
+
+			err := req.ParseForm()
+			if err != nil {
+				http.Error(w, "Unable to parse form data.", http.StatusBadRequest)
+				return
+			}
+
+			content := req.FormValue("content")
+			if len(content) > 1000 {
+				http.Error(w, "Content is too long.", http.StatusBadRequest)
+				return
+			}
+
+			err = os.WriteFile(contentFile, []byte(content), 0644)
+			if err != nil {
+				log.Printf("Failed to write to file: %v", err)
+				http.Error(w, "Failed to save content.", http.StatusInternalServerError)
+				return
+			}
+			http.Redirect(w, req, "/about", http.StatusSeeOther)
 			return
 		}
-
-		err := r.ParseForm()
+		err := TPL.ExecuteTemplate(w, templateName, loginData{Login: loggedIn})
 		if err != nil {
-			http.Error(w, "Unable to parse form data.", http.StatusBadRequest)
-			return
+			http.Error(w, "Template error", http.StatusInternalServerError)
 		}
-
-		content := r.FormValue("content")
-		if len(content) > 1000 {
-			http.Error(w, "Content is too long.", http.StatusBadRequest)
-			return
-		}
-
-		err = os.WriteFile("data/serve/about.txt", []byte(content), 0644)
-		if err != nil {
-			log.Printf("Failed to write to file: %v", err)
-			http.Error(w, "Failed to save content.", http.StatusInternalServerError)
-			return
-		}
-		http.Redirect(w, r, "/about", http.StatusSeeOther)
-		return
-	}
-
-	err := TPL.ExecuteTemplate(w, "about.gohtml", loginData{Login: loggedIn})
-	if err != nil {
-		http.Error(w, "Failed to render template.", http.StatusInternalServerError)
 	}
 }
 
-func contactHandler(w http.ResponseWriter, r *http.Request) {
-	_, loggedIn := getLoginStatus(r)
-
-	if r.Method == http.MethodPost {
+func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		_, loggedIn := getLoginStatus(r)
 		if !loggedIn {
-			http.Error(w, "Unauthorized: You must be logged in to update this page.", http.StatusForbidden)
+			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
-
-		err := r.ParseForm()
-		if err != nil {
-			http.Error(w, "Unable to parse form data.", http.StatusBadRequest)
-			return
-		}
-
-		content := r.FormValue("content")
-		if len(content) > 1000 {
-			http.Error(w, "Content is too long.", http.StatusBadRequest)
-			return
-		}
-
-		err = os.WriteFile("data/serve/contact.txt", []byte(content), 0644)
-		if err != nil {
-			log.Printf("Failed to write to file: %v", err)
-			http.Error(w, "Failed to save content.", http.StatusInternalServerError)
-			return
-		}
-		http.Redirect(w, r, "/contact", http.StatusSeeOther)
-		return
-	}
-
-	err := TPL.ExecuteTemplate(w, "contact.gohtml", loginData{Login: loggedIn})
-	if err != nil {
-		http.Error(w, "Failed to render template.", http.StatusInternalServerError)
+		next(w, r)
 	}
 }
 
@@ -203,12 +387,15 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", mainPageHandler)
+	mux.HandleFunc("/text", listTextHandler)
+	mux.HandleFunc("/text/", viewTextHandler)
+	mux.HandleFunc("/portfolio", portfolioHandler)
 	mux.HandleFunc("/login", loginHandler)
 	mux.HandleFunc("/logout", logoutHandler)
-	mux.HandleFunc("/upload", uploadHandler)
+	mux.HandleFunc("/upload", authMiddleware(uploadHandler))
 	mux.Handle("/blob/", fileHandler)
-	mux.HandleFunc("/about", aboutHandler)
-	mux.HandleFunc("/contact", contactHandler)
+	mux.HandleFunc("/about", contentHandler("about.gohtml", "data/serve/about.txt"))
+	mux.HandleFunc("/contact", contentHandler("contact.gohtml", "data/serve/contact.txt"))
 	mux.Handle("/favicon.ico", http.NotFoundHandler())
 	mux.Handle("/robots.txt", AddPrefixHandler("/blob", fileHandler))
 	mux.HandleFunc("/style.css", styleSheetHandler)
@@ -251,7 +438,64 @@ func configDatabase() error {
 		log.Printf("configDatabase: %q: %s\n", err, createUserTable)
 		return err
 	}
+
+	createTextTable := `
+	CREATE TABLE IF NOT EXISTS texts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_texts_user_id ON texts(user_id);
+    CREATE INDEX IF NOT EXISTS idx_texts_created_at ON texts(created_at);
+	`
+	_, err = DB.Exec(createTextTable)
+	if err != nil {
+		log.Printf("configDatabase: %q: %s\n", err, createTextTable)
+		return err
+	}
 	return nil
+}
+
+func getTexts(id ...int) ([]Text, error) {
+	var query string
+	var args []interface{}
+
+	query = "SELECT id, title, content, created_at FROM texts"
+
+	if len(id) > 0 {
+		query += " WHERE id = $1"
+		args = append(args, id[0])
+	}
+
+	query += " ORDER BY created_at DESC;"
+
+	rows, err := DB.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var texts []Text
+	var timestamp time.Time
+
+	for rows.Next() {
+		var t Text
+		if err := rows.Scan(&t.ID, &t.Title, &t.Content, &timestamp); err != nil {
+			return nil, err
+		}
+		t.Timestamp = &timestamp
+		texts = append(texts, t)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return texts, nil
 }
 
 func login(email string, password []byte) (*int, error) {
@@ -334,6 +578,39 @@ func insertUser(user User) error {
 	return nil
 }
 
+func insertText(text Text) error {
+	sqlStmt := `
+		INSERT INTO texts (user_id, title, content) VALUES (?, ?, ?);
+	`
+	_, err := DB.Exec(sqlStmt, text.UserID, text.Title, text.Content)
+	if err != nil {
+		return fmt.Errorf("insertText: %v", err)
+	}
+	return nil
+}
+
+func updateText(text Text) error {
+	sqlStmt := `
+        UPDATE texts
+        SET title = ?, content = ?
+        WHERE id = ? AND user_id = ?;
+    `
+	result, err := DB.Exec(sqlStmt, text.Title, text.Content, text.ID, text.UserID)
+	if err != nil {
+		return fmt.Errorf("updateText: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("updateText (rows affected): %v", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("no rows updated - either text doesn't exist or user doesn't have permission")
+	}
+
+	return nil
+}
+
 func getLoginStatus(req *http.Request) (*int, bool) {
 	cookie, err := req.Cookie("session")
 	if err != nil {
@@ -352,7 +629,7 @@ func storeFiles(r *http.Request) error {
 	if !ok {
 		return fmt.Errorf("request is unauthenticated")
 	}
-	err := r.ParseMultipartForm(10000000) // max 10 megabytes
+	err := r.ParseMultipartForm(10_000_000) // max 10 megabytes
 	if err != nil {
 		return fmt.Errorf("error parsing form data: %v", err)
 	}
@@ -378,7 +655,7 @@ func storeFiles(r *http.Request) error {
 		}
 
 		if mimeType == "application/pdf" {
-			err = store("data/portfolio.pdf", parsedFile)
+			err = store("data/serve/portfolio.pdf", parsedFile)
 		}
 	}
 	return nil
