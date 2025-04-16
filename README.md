@@ -7,5 +7,4 @@
 5. restart server, should pull new image.
 
 ## TODO
-- Add Works page, with upload button
 - Improve this readme
