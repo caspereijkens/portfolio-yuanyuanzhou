@@ -1,0 +1,51 @@
+{{ template "head" .Work.Title }}
+<body>
+    {{ template "navbar" .Login }}
+
+    {{ if .Login }}
+        <form action="/work/{{ .Work.ID }}" method="POST" enctype="multipart/form-data" class="work-form">
+            <div class="form-group">
+                <label for="title">Title:</label>
+                <input type="text" id="title" name="title" value="{{ .Work.Title }}" required>
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description:</label>
+                <textarea id="description" name="description" rows="5" required>{{ .Work.Description }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Add More Photos:</label>
+                <input type="file" name="photos" multiple accept="image/jpeg,image/png,image/webp">
+                <small>Max 10MB per file</small>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="save-button">Save Changes</button>
+            </div>
+        </form>
+        <form action="/work/{{ .Work.ID }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this work?')" class="delete-form">
+            <input type="hidden" name="_method" value="DELETE">
+            <button type="submit" class="delete-button">Delete Work</button>
+        </form>
+    {{ end }}
+    <article class="work-display">
+        <h1>{{ .Work.Title }}</h1>
+        <time>{{ .Work.CreatedAt.Format "2006-01-02" }}</time>
+
+        <div class="description">{{ .Work.Description }}</div>
+
+        <div class="photo-gallery">
+            {{ range .Work.Photos }}
+            <img src="/blob/{{ . }}" alt="{{ . }}">
+            {{ end }}
+        </div>
+    </article>
+</body>
+<script>
+    function confirmDelete() {
+        if (confirm('Are you sure you want to delete this work?')) {
+            document.getElementById('method-field').value = 'DELETE';
+            document.querySelector('.work-form').submit();
+        }
+    }
+</script>

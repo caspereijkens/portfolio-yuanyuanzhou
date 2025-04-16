@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+{{ template "head" .Text.Title }}
+    <body>
+    {{template "navbar" .Login }}
+    <h1>{{.Text.Title}}</h1>
+    <div class="timestamp">Created at: {{.Text.Timestamp.Format "Jan 2, 2006 at 15:04"}}</div>
+    <hr>
+    <div class="content">{{.Text.Content}}</div>
+    {{ if .Login }}
+    <div class="text-form">
+    <form action="/text/{{.Text.ID}}" method="POST">
+        <h2>Edit Text</h2>
+        <input type="hidden" name="id" value="{{.Text.ID}}">
+
+        <div>
+            <label>Title:</label><br>
+            <input type="text" name="title" value="{{.Text.Title}}" size="50" required>
+        </div>
+
+        <div>
+            <label>Content:</label><br>
+            <textarea name="content" cols="50" rows="10" required>{{.Text.Content}}</textarea>
+        </div>
+
+        <div>
+            <button type="submit">Save Changes</button>
+            <a href="/text">Cancel</a>
+        </div>
+    </form>
+    </div>
+    {{ end }}
+</body>
+</html>

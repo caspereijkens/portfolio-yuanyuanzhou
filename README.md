@@ -5,3 +5,6 @@
 3. Build Docker image.
 4. ssh to server, pull changes.
 5. restart server, should pull new image.
+
+## TODO
+- Improve this readme
