@@ -5,7 +5,7 @@
     {{template "navbar" .Login }}
     {{ if .Login }}
     <h1>Upload</h1>
-    <form action="/upload" method="POST" enctype="multipart/form-data" id="uploadForm">
+    <form action="/portfolio" method="POST" enctype="multipart/form-data" id="uploadForm">
         <label for="file">Select File:</label>
         <input type="file" name="file" id="file" required>
         <button type="submit">Upload</button>
