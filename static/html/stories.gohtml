@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+{{ template "head" "Yuanyuan Zhou Story" }}
+    <body>
+        <h1>Yuanyuan Zhou</h1>
+<pre>
+<a href="/">..</a>
+{{ range .Stories -}}
+<a href="/story/{{ .ID }}">{{ .Timestamp.Format "Jan _2 15:04"}} {{.Title}}</a>
+{{ end -}}
+</pre>
+        <hr>
+        {{if .Login}}
+        <div>
+            <h2>Add New Story</h2>
+            <form action="/post?type=story" method="POST">
+                <div>
+                    <input type="text" name="title" placeholder="Title" required>
+                </div>
+                <div>
+                    <textarea name="content" placeholder="Your story..." required></textarea>
+                </div>
+                <div>
+                    <button type="submit">Submit</button>
+                </div>
+            </form>
+        </div>
+        {{end}}
+
+</body>
+</html>

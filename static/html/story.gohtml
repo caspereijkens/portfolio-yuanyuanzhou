@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+{{ template "head" .Story.Title }}
+    <body>
+    {{template "navbar" .Login }}
+    <h1>{{.Story.Title}}</h1>
+
+    <div class="timestamp">Created at: {{.Story.Timestamp.Format "Jan 2, 2006 at 15:04"}}</div>
+    <hr>
+    <div>{{.Story.Content}}</div>
+    {{ if .Login }}
+    <div>
+    <form action="/patch?type=story" method="PATCH">
+        <h2>Edit Story</h2>
+        <input type="hidden" name="id" value="{{.Story.ID}}">
+
+        <div>
+            <label>Title:</label><br>
+            <input type="text" name="title" value="{{.Story.Title}}" required>
+        </div>
+
+        <div>
+            <label>Content:</label><br>
+            <textarea name="content" required>{{.Story.Content}}</textarea>
+        </div>
+
+        <div>
+            <button type="submit">Save Changes</button>
+            <a href="/stories">Cancel</a>
+        </div>
+    </form>
+    </div>
+    {{ end }}
+</body>
+</html>

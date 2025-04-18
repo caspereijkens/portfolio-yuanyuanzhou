@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+    {{ template "head" "Yuanyuan Zhou Info" }}
+    <body>
+        {{template "navbar" .Login }}
+        <h1>About</h1>
+        <iframe src="/fs/info.txt" width="100%"></iframe>
+        <hr>
+        {{ if .Login }}
+        <form action="/post?type=info" method="POST">
+            <textarea name="content"></textarea>
+            <br>
+            <button type="submit">Update</button>
+        </form>
+        {{ end }}
+    </body>
+</html>
