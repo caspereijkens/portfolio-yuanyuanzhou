@@ -1,14 +1,13 @@
 {{ define "navbar" }}
-<header>
-    <nav style="display: flex; justify-content: flex-end;">
-        <button style="margin-right: 10px;"><a href="/work">Work</a></button>
-        <button style="margin-right: 10px;"><a href="/text">Text</a></button>
-        <button style="margin-right: 10px;"><a href="/about">About</a></button>
-        <button style="margin-right: 10px;"><a href="/contact">Contact</a></button>
-        <button style="margin-right: 10px;"><a href="/portfolio">Portfolio</a></button>
-        {{ if eq true . }}
-        <button style="margin-right: 10px;"><a href="/logout">Logout</a></button>
-        {{ end }}
-    </nav>
-</header>
+<h1>Yuanyuan Zhou</h1>
+<pre>
+<a href="/">~</a>
+<a href="/visuals">visual/</a>
+<a href="/stories">stories/</a>
+<a href="/info">info</a>
+<a href="/fs/portfolio.pdf">portfolio</a>
+{{ if eq true . }}
+<a href="/logout">logout</a>
+{{ end }}
+</pre>
 {{ end }}

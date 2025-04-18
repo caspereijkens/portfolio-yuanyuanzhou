@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"net/http"
+	"net/url"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -29,7 +30,7 @@ var DB *sql.DB
 var err error
 var sessionStore = make(map[string]int)
 
-const localBlobDir = "data/"
+const localFSDir = "data/"
 const backGroundColor = "fffeec"
 
 type User struct {
@@ -37,7 +38,7 @@ type User struct {
 	PasswordDigest []byte
 }
 
-type Text struct {
+type Story struct {
 	ID        int
 	UserID    int
 	Title     string
@@ -45,7 +46,15 @@ type Text struct {
 	Timestamp *time.Time
 }
 
-type Work struct {
+type Info struct {
+	ID        int
+	UserID    int
+	Title     string
+	Content   string
+	Timestamp *time.Time
+}
+
+type Visual struct {
 	ID          int       `db:"id"`
 	UserID      int       `db:"user_id"`
 	Title       string    `db:"title"`
@@ -58,35 +67,27 @@ type loginData struct {
 	Login bool
 }
 
-type aboutData struct {
+type listStoryData struct {
 	Login   bool
-	Content string
+	Stories []Story
 }
 
-type listTextData struct {
+type listVisualData struct {
+	Login   bool
+	Visuals []Visual
+}
+
+type storyData struct {
 	Login bool
-	Texts []Text
+	Story Story
 }
 
-type listWorkData struct {
-	Login bool
-	Works []Work
-}
-
-type viewTextData struct {
-	Login bool
-	Text  Text
-}
-
-var allowedMIMETypes = map[string]bool{
-	"application/pdf": true,
-	"image/jpeg":      true,
-	"image/png":       true,
-	"image/heic":      true,
+type visualData struct {
+	Login  bool
+	Visual Visual
 }
 
 type FileUploadConfig struct {
-	FieldName      string
 	AllowedTypes   map[string]bool
 	DestinationDir string
 	Filename       string // If empty, will generate unique name
@@ -101,372 +102,234 @@ func mainPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, loggedIn := getLoginStatus(r)
 
-	if r.Method == http.MethodPost {
-		if !loggedIn {
-			http.Error(w, "Unauthorized", http.StatusForbidden)
-			return
-		}
-
-		config := FileUploadConfig{
-			FieldName: "image",
-			AllowedTypes: map[string]bool{
-				"image/jpeg": true,
-				"image/png":  true,
-				"image/heic": true,
-			},
-			Filename:       "profile.jpg",
-			DestinationDir: "data/serve",
-			MaxSize:        10 << 20, // 10 MB
-		}
-
-		if _, err := HandleFileUpload(r, config); err != nil {
-			if !errors.Is(err, http.ErrMissingFile) {
-				log.Printf("Error processing image upload: %v", err)
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-		}
-
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
 	err := TPL.ExecuteTemplate(w, "index.gohtml", loginData{Login: loggedIn})
 	if err != nil {
 		http.Error(w, "Failed to render template", http.StatusInternalServerError)
 	}
 }
 
-func portfolioHandler(w http.ResponseWriter, r *http.Request) {
-	_, loggedIn := getLoginStatus(r)
+func infoHandler(w http.ResponseWriter, req *http.Request) {
+	_, loggedIn := getLoginStatus(req)
 
-	if r.Method == http.MethodPost {
+	err := TPL.ExecuteTemplate(w, "info.gohtml", loginData{Login: loggedIn})
+	if err != nil {
+		http.Error(w, "Failed to render template", http.StatusInternalServerError)
+	}
+}
+
+func postHandler(w http.ResponseWriter, req *http.Request) {
+	_, loggedIn := getLoginStatus(req)
+
+	if req.Method == http.MethodPost {
 		if !loggedIn {
 			http.Error(w, "Unauthorized", http.StatusForbidden)
 			return
 		}
 
+		queryParams, err := url.ParseQuery(req.URL.RawQuery)
+		if err != nil {
+			log.Printf("Error parsing query: %v", err)
+			http.Error(w, "Malformatted URL in request", http.StatusBadRequest)
+			return
+		}
+
+		typeParam := queryParams.Get("type")
+
+		err = req.ParseMultipartForm(10 << 20)
+		if err != nil {
+			log.Printf("Error parsing form: %v", err)
+			http.Error(w, "Unable to parse form data.", http.StatusBadRequest)
+			return
+		}
+
+		post(w, req, typeParam)
+	}
+
+	return
+}
+
+func post(w http.ResponseWriter, req *http.Request, typeParam string) {
+	userID, _ := getLoginStatus(req)
+
+	log.Printf("Posting %s", typeParam)
+	switch typeParam {
+	case "visual":
+		visual := Visual{
+			UserID:      *userID,
+			Title:       req.FormValue("title"),
+			Description: req.FormValue("description"),
+		}
+		log.Printf("title: %s, description: %s", visual.Title, visual.Description)
+		safeTitle := sanitizeFilename(visual.Title)
+		visualDir := fmt.Sprintf("./data/serve/visual/%s", safeTitle)
+		var photoPaths []string
+		log.Println("Just before listing files")
+		files := req.MultipartForm.File["photos"]
+		log.Println("Just before file upload")
+		for _, fileHeader := range files {
+			log.Println("Just before config decl")
+			config := FileUploadConfig{
+				AllowedTypes: map[string]bool{
+					"image/jpeg": true,
+					"image/png":  true,
+					"image/heic": true,
+				},
+				DestinationDir: visualDir,
+				MaxSize:        2_000_000,
+			}
+			filePath, err := storeFile(fileHeader, config)
+			if err != nil {
+				log.Printf("Error uploading file: %v", err)
+				http.Error(w, "error storing file object", http.StatusInternalServerError)
+				return
+			}
+			photoPaths = append(photoPaths, filePath)
+		}
+
+		visual.Photos = photoPaths
+		id, err := insertVisual(visual)
+		if err != nil {
+			os.RemoveAll(visualDir)
+			http.Error(w, "Failed to save visual", http.StatusInternalServerError)
+			log.Printf("Error inserting visual: %v", err)
+			return
+		}
+		http.Redirect(w, req, fmt.Sprintf("/visual/%d", id), http.StatusSeeOther)
+	case "story":
+		story := Story{
+			UserID:  *userID,
+			Title:   req.FormValue("title"),
+			Content: req.FormValue("content"),
+		}
+		id, err := insertStory(story)
+		if err != nil {
+			http.Error(w, "Failed to save story", http.StatusInternalServerError)
+			log.Printf("Error inserting story: %v", err)
+			return
+		}
+		http.Redirect(w, req, fmt.Sprintf("/story/%d", id), http.StatusSeeOther)
+	case "info":
+		info := Info{
+			UserID:  *userID,
+			Content: req.FormValue("content"),
+		}
+		err := updateInfo(info)
+		if err != nil {
+			http.Error(w, "Failed to save info", http.StatusInternalServerError)
+			log.Printf("Error inserting info: %v", err)
+			return
+		}
+		http.Redirect(w, req, "/info", http.StatusSeeOther)
+	case "portfolio":
+		_, header, err := req.FormFile("file")
+		if err != nil {
+			http.Error(w, "Failed to save info", http.StatusInternalServerError)
+			log.Printf("Error getting file from form: %v", err)
+			return
+		}
 		config := FileUploadConfig{
-			FieldName:      "file",
 			AllowedTypes:   map[string]bool{"application/pdf": true},
 			Filename:       "portfolio.pdf",
 			DestinationDir: "data/serve",
 			MaxSize:        10_000_000,
 		}
-
-		if _, err := HandleFileUpload(r, config); err != nil {
+		if _, err := storeFile(header, config); err != nil {
 			log.Println(err)
 			http.Error(w, "error storing file object", http.StatusInternalServerError)
 			return
 		}
-
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
-	err := TPL.ExecuteTemplate(w, "portfolio.gohtml", loginData{Login: loggedIn})
-	if err != nil {
-		http.Error(w, "error templating page", http.StatusInternalServerError)
+		http.Redirect(w, req, "/fs/portfolio.pdf", http.StatusSeeOther)
+	default:
+		log.Printf("Error parsing query: %v", err)
+		http.Error(w, "Malformatted URL in request", http.StatusBadRequest)
 	}
 }
 
-func listTextHandler(w http.ResponseWriter, req *http.Request) {
-	userID, loggedIn := getLoginStatus(req)
+func listStoryHandler(w http.ResponseWriter, req *http.Request) {
+	_, loggedIn := getLoginStatus(req)
 
-	if req.Method == http.MethodPost {
-		if !loggedIn {
-			http.Error(w, "Unauthorized", http.StatusForbidden)
-			return
-		}
-
-		err := req.ParseForm()
-		if err != nil {
-			http.Error(w, "Unable to parse form data.", http.StatusBadRequest)
-			return
-		}
-
-		text := Text{
-			UserID:  *userID,
-			Title:   req.FormValue("title"),
-			Content: req.FormValue("content"),
-		}
-		err = insertText(text)
-		if err != nil {
-			http.Error(w, "Failed to save text", http.StatusInternalServerError)
-			log.Printf("Error inserting text: %v", err)
-			return
-		}
-	}
-
-	texts, err := getTexts()
+	stories, err := getStories()
 	if err != nil {
-		http.Error(w, "Failed to retrieve texts", http.StatusInternalServerError)
-		log.Printf("Error retrieving texts: %v", err)
+		http.Error(w, "Failed to retrieve stories", http.StatusInternalServerError)
+		log.Printf("Error retrieving stories: %v", err)
 		return
 	}
 
-	err = TPL.ExecuteTemplate(w, "textlist.gohtml", listTextData{Login: loggedIn, Texts: texts})
+	err = TPL.ExecuteTemplate(w, "stories.gohtml", listStoryData{Login: loggedIn, Stories: stories})
 	if err != nil {
 		http.Error(w, "Template error", http.StatusInternalServerError)
 	}
 }
 
-func listWorkHandler(w http.ResponseWriter, req *http.Request) {
-	userID, loggedIn := getLoginStatus(req)
+func listVisualHandler(w http.ResponseWriter, req *http.Request) {
+	_, loggedIn := getLoginStatus(req)
 
-	if req.Method == http.MethodPost {
-		if !loggedIn {
-			http.Error(w, "Unauthorized", http.StatusForbidden)
-			return
-		}
-
-		// 1. Prepare work data
-		work := Work{
-			UserID:      *userID,
-			Title:       req.FormValue("title"),
-			Description: req.FormValue("description"),
-		}
-
-		// 2. Create directory for this work's files
-		safeTitle := sanitizeFilename(work.Title)
-		workDir := fmt.Sprintf("./data/serve/work/%s", safeTitle)
-		if err := os.MkdirAll(workDir, 0755); err != nil {
-			http.Error(w, "Failed to create work directory", http.StatusInternalServerError)
-			return
-		}
-
-		// 3. Process file uploads
-		var photoPaths []string
-		files := req.MultipartForm.File["photos"]
-
-		for _, fileHeader := range files {
-			file, err := fileHeader.Open()
-			if err != nil {
-				log.Printf("Error opening uploaded file: %v", err)
-				continue
-			}
-			defer file.Close()
-
-			ext := filepath.Ext(fileHeader.Filename)
-			fileName := fmt.Sprintf("%s%s", uuid.NewV4().String(), ext)
-			filePath := filepath.Join(workDir, fileName)
-
-			if err := saveFile(file, filePath); err != nil {
-				log.Printf("Error saving file: %v", err)
-				continue
-			}
-
-			photoPaths = append(photoPaths, filepath.Join("work", safeTitle, fileName))
-		}
-
-		// 4. Save work to database with photo paths
-		work.Photos = photoPaths
-		_, err := insertWork(work)
-		if err != nil {
-			// Cleanup uploaded files if DB fails
-			os.RemoveAll(workDir)
-			http.Error(w, "Failed to save work", http.StatusInternalServerError)
-			log.Printf("Error inserting work: %v", err)
-			return
-		}
-
-		http.Redirect(w, req, "/work", http.StatusSeeOther)
-		return
-	}
-
-	// GET request handling (unchanged)
-	works, err := getWorks()
+	visuals, err := getVisuals()
 	if err != nil {
-		http.Error(w, "Failed to retrieve works", http.StatusInternalServerError)
-		log.Printf("Error retrieving works: %v", err)
+		http.Error(w, "Failed to retrieve visuals", http.StatusInternalServerError)
+		log.Printf("Error retrieving visuals: %v", err)
 		return
 	}
 
-	err = TPL.ExecuteTemplate(w, "worklist.gohtml", listWorkData{Login: loggedIn, Works: works})
+	err = TPL.ExecuteTemplate(w, "visuals.gohtml", listVisualData{Login: loggedIn, Visuals: visuals})
 	if err != nil {
 		http.Error(w, "Template error", http.StatusInternalServerError)
 	}
 }
 
-func viewWorkHandler(w http.ResponseWriter, req *http.Request) {
-	// Extract ID from URL
-	idStr := strings.TrimPrefix(req.URL.Path, "/work/")
+func visualHandler(w http.ResponseWriter, req *http.Request) {
+	idStr := strings.TrimPrefix(req.URL.Path, "/visual/")
 
 	if idStr == "" {
-		listWorkHandler(w, req) // Reuse your existing list handler
+		listVisualHandler(w, req) // Reuse your existing list handler
 		return
 	}
 
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid work ID - must be an integer", http.StatusBadRequest)
+		http.Error(w, "Invalid visual ID - must be an integer", http.StatusBadRequest)
 		return
 	}
 
-	// Fetch work with photos
-	works, err := getWorks(id)
+	visuals, err := getVisuals(id)
 	if err != nil {
-		http.Error(w, "Failed to retrieve work", http.StatusInternalServerError)
-		log.Printf("Error retrieving work: %v", err)
+		http.Error(w, "Failed to retrieve visual", http.StatusInternalServerError)
+		log.Printf("Error retrieving visual: %v", err)
 		return
 	}
-	if len(works) == 0 {
+	if len(visuals) == 0 {
 		http.NotFound(w, req)
 		return
 	}
-	work := works[0]
+	visual := visuals[0]
 
-	// Check login status
 	_, loggedIn := getLoginStatus(req)
 
-	// Handle POST (update)
-	if req.Method == http.MethodPost {
-		if !loggedIn {
-			http.Error(w, "Unauthorized", http.StatusForbidden)
-			return
-		}
-
-		if req.FormValue("_method") == "DELETE" {
-			if err := deleteWork(work.ID); err != nil {
-				http.Error(w, "Failed to delete work", http.StatusInternalServerError)
-				log.Printf("Error deleting work: %v", err)
-				return
-			}
-			// Cleanup files
-			go cleanupWorkFiles(work)
-			http.Redirect(w, req, "/work", http.StatusSeeOther)
-			return
-		}
-
-		// Parse form (including multipart for potential new photos)
-		if err := req.ParseMultipartForm(32 << 20); err != nil {
-			http.Error(w, "Unable to parse form data", http.StatusBadRequest)
-			return
-		}
-
-		// Update basic fields
-		updatedWork := Work{
-			ID:          work.ID,
-			UserID:      work.UserID, // Preserve original owner
-			Title:       req.FormValue("title"),
-			Description: req.FormValue("description"),
-		}
-
-		// Process new file uploads if any
-		if fileHeaders := req.MultipartForm.File["photos"]; len(fileHeaders) > 0 {
-			newPaths, err := saveWorkPhotos(updatedWork.Title, fileHeaders)
-			if err != nil {
-				http.Error(w, "Failed to save photos", http.StatusInternalServerError)
-				log.Printf("Error saving photos: %v", err)
-				return
-			}
-			updatedWork.Photos = append(updatedWork.Photos, newPaths...)
-		}
-
-		// Update in database
-		if err := updateWork(updatedWork); err != nil {
-			http.Error(w, "Failed to update work", http.StatusInternalServerError)
-			log.Printf("Error updating work: %v", err)
-			return
-		}
-
-		// Redirect to avoid resubmission
-		http.Redirect(w, req, req.URL.Path, http.StatusSeeOther)
-		return
-	}
-
-	// Render template
-	err = TPL.ExecuteTemplate(w, "work.gohtml", struct {
-		Login bool
-		Work  Work
-	}{
-		Login: loggedIn,
-		Work:  work,
-	})
+	err = TPL.ExecuteTemplate(w, "visual.gohtml", visualData{Login: loggedIn, Visual: visual})
 	if err != nil {
 		http.Error(w, "Template error", http.StatusInternalServerError)
 	}
 }
 
-// Helper to save uploaded photos for a work
-func saveWorkPhotos(workTitle string, fileHeaders []*multipart.FileHeader) ([]string, error) {
-	safeTitle := sanitizeFilename(workTitle)
-	workDir := fmt.Sprintf("./data/serve/work/%s", safeTitle)
-	if err := os.MkdirAll(workDir, 0755); err != nil {
-		return nil, err
-	}
-
-	var paths []string
-	for _, fileHeader := range fileHeaders {
-		file, err := fileHeader.Open()
-		if err != nil {
-			return nil, fmt.Errorf("error opening uploaded file: %v", err)
-		}
-		defer file.Close()
-
-		// Generate unique filename
-		ext := filepath.Ext(fileHeader.Filename)
-		fileName := fmt.Sprintf("%d_%s%s", time.Now().UnixNano(), uuid.NewV4().String(), ext)
-		filePath := filepath.Join(workDir, fileName)
-
-		// Save file using our common function
-		if err := saveFile(file, filePath); err != nil {
-			return nil, fmt.Errorf("error saving file: %v", err)
-		}
-
-		paths = append(paths, filepath.Join("work", safeTitle, fileName))
-	}
-	return paths, nil
-}
-
-func viewTextHandler(w http.ResponseWriter, req *http.Request) {
-	idStr := strings.TrimPrefix(req.URL.Path, "/text/")
-
-	if idStr == "" {
-		listTextHandler(w, req)
-		return
-	}
+func storyHandler(w http.ResponseWriter, req *http.Request) {
+	idStr := strings.TrimPrefix(req.URL.Path, "/story/")
 
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid post ID - must be an integer", http.StatusBadRequest)
+		http.Redirect(w, req, "/stories", http.StatusSeeOther)
 		return
 	}
 
-	texts, err := getTexts(id)
+	stories, err := getStories(id)
 	if err != nil {
-		http.Error(w, "Failed to retrieve texts", http.StatusInternalServerError)
-		log.Printf("Error retrieving texts: %v", err)
+		log.Printf("Error retrieving stories: %v", err)
+		http.Error(w, "Failed to retrieve stories", http.StatusInternalServerError)
 		return
 	}
 
-	text := texts[0]
+	story := stories[0]
 	_, loggedIn := getLoginStatus(req)
-
-	if req.Method == http.MethodPost {
-		if !loggedIn {
-			http.Error(w, "Unauthorized", http.StatusForbidden)
-			return
-		}
-
-		err := req.ParseForm()
-		if err != nil {
-			http.Error(w, "Unable to parse form data.", http.StatusBadRequest)
-			return
-		}
-
-		text.Title = req.FormValue("title")
-		text.Content = req.FormValue("content")
-
-		err = updateText(text)
-		if err != nil {
-			http.Error(w, "Failed to save text", http.StatusInternalServerError)
-			log.Printf("Error inserting text: %v", err)
-			return
-		}
-	}
-
-	err = TPL.ExecuteTemplate(w, "text.gohtml", viewTextData{Login: loggedIn, Text: text})
+	err = TPL.ExecuteTemplate(w, "story.gohtml", storyData{Login: loggedIn, Story: story})
 	if err != nil {
 		http.Error(w, "Template error", http.StatusInternalServerError)
 	}
@@ -497,44 +360,6 @@ func styleSheetHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "static/styles/style.css")
 }
 
-func contentHandler(templateName, contentFile string) http.HandlerFunc {
-	return func(w http.ResponseWriter, req *http.Request) {
-		_, loggedIn := getLoginStatus(req)
-
-		if req.Method == http.MethodPost {
-			if !loggedIn {
-				http.Error(w, "Unauthorized", http.StatusForbidden)
-				return
-			}
-
-			err := req.ParseForm()
-			if err != nil {
-				http.Error(w, "Unable to parse form data.", http.StatusBadRequest)
-				return
-			}
-
-			content := req.FormValue("content")
-			if len(content) > 1000 {
-				http.Error(w, "Content is too long.", http.StatusBadRequest)
-				return
-			}
-
-			err = os.WriteFile(contentFile, []byte(content), 0644)
-			if err != nil {
-				log.Printf("Failed to write to file: %v", err)
-				http.Error(w, "Failed to save content.", http.StatusInternalServerError)
-				return
-			}
-			http.Redirect(w, req, "/about", http.StatusSeeOther)
-			return
-		}
-		err := TPL.ExecuteTemplate(w, templateName, loginData{Login: loggedIn})
-		if err != nil {
-			http.Error(w, "Template error", http.StatusInternalServerError)
-		}
-	}
-}
-
 func main() {
 	port := determinePort()
 
@@ -549,22 +374,22 @@ func main() {
 		log.Fatalf("Failed to start database: %v", err)
 	}
 
-	fileHandler := http.StripPrefix("/blob/", http.FileServer(http.Dir("data/serve")))
+	fileHandler := http.StripPrefix("/fs/", http.FileServer(http.Dir("data/serve")))
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", mainPageHandler)
-	mux.HandleFunc("/text", listTextHandler)
-	mux.HandleFunc("/text/", viewTextHandler)
-	mux.HandleFunc("/work", listWorkHandler)
-	mux.HandleFunc("/work/", viewWorkHandler)
-	mux.HandleFunc("/portfolio", portfolioHandler)
+	mux.HandleFunc("/post", postHandler)
+	mux.HandleFunc("/stories", listStoryHandler)
+	mux.HandleFunc("/story/", storyHandler)
+	mux.HandleFunc("/visuals", listVisualHandler)
+	mux.HandleFunc("/visual/", visualHandler)
+	mux.HandleFunc("/info", infoHandler)
 	mux.HandleFunc("/login", loginHandler)
 	mux.HandleFunc("/logout", logoutHandler)
-	mux.Handle("/blob/", fileHandler)
-	mux.HandleFunc("/about", contentHandler("about.gohtml", "data/serve/about.txt"))
-	mux.HandleFunc("/contact", contentHandler("contact.gohtml", "data/serve/contact.txt"))
+	mux.Handle("/fs/", fileHandler)
 	mux.Handle("/favicon.ico", http.NotFoundHandler())
-	mux.Handle("/robots.txt", AddPrefixHandler("/blob", fileHandler))
+	mux.Handle("/robots.txt", AddPrefixHandler("/fs", fileHandler))
+	mux.Handle("/portfolio.pdf", AddPrefixHandler("/fs", fileHandler))
 	mux.HandleFunc("/style.css", styleSheetHandler)
 
 	srv := &http.Server{
@@ -593,11 +418,10 @@ func determinePort() string {
 }
 
 func configDatabase() error {
-	// Existing users table creation
 	createUserTable := `
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT NOT NULL UNIQUE,
+        email story NOT NULL UNIQUE,
         password_digest BLOB NOT NULL
     );
     `
@@ -607,72 +431,89 @@ func configDatabase() error {
 		return err
 	}
 
-	// Existing texts table creation
-	createTextTable := `
-    CREATE TABLE IF NOT EXISTS texts (
+	createStoryTable := `
+    CREATE TABLE IF NOT EXISTS stories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         title TEXT NOT NULL,
         content TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id)
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        UNIQUE(user_id, title)
     );
-
-    CREATE INDEX IF NOT EXISTS idx_texts_user_id ON texts(user_id);
-    CREATE INDEX IF NOT EXISTS idx_texts_created_at ON texts(created_at);
+    
+    CREATE INDEX IF NOT EXISTS idx_stories_user_id ON stories(user_id);
+    CREATE INDEX IF NOT EXISTS idx_stories_created_at ON stories(created_at);
     `
-	_, err = DB.Exec(createTextTable)
+	_, err = DB.Exec(createStoryTable)
 	if err != nil {
-		log.Printf("configDatabase: %q: %s\n", err, createTextTable)
+		log.Printf("configDatabase: %q: %s\n", err, createStoryTable)
 		return err
 	}
 
-	// New works table
-	createWorkTable := `
-    CREATE TABLE IF NOT EXISTS works (
+	createVisualTable := `
+    CREATE TABLE IF NOT EXISTS visuals (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
-        title TEXT NOT NULL,
-        description TEXT NOT NULL,
+        title story NOT NULL,
+        description story NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id)
     );
 
-    CREATE INDEX IF NOT EXISTS idx_works_user_id ON works(user_id);
-    CREATE INDEX IF NOT EXISTS idx_works_created_at ON works(created_at);
+    CREATE INDEX IF NOT EXISTS idx_visuals_user_id ON visuals(user_id);
+    CREATE INDEX IF NOT EXISTS idx_visuals_created_at ON visuals(created_at);
     `
-	_, err = DB.Exec(createWorkTable)
+	_, err = DB.Exec(createVisualTable)
 	if err != nil {
-		log.Printf("configDatabase: %q: %s\n", err, createWorkTable)
+		log.Printf("configDatabase: %q: %s\n", err, createVisualTable)
 		return err
 	}
 
-	// New work_photos table (for storing photo paths)
-	createWorkPhotosTable := `
-    CREATE TABLE IF NOT EXISTS work_photos (
+	createVisualPhotosTable := `
+    CREATE TABLE IF NOT EXISTS visual_photos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        work_id INTEGER NOT NULL,
-        file_path TEXT NOT NULL,
+        visual_id INTEGER NOT NULL,
+        file_path story NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (work_id) REFERENCES works(id) ON DELETE CASCADE
+        FOREIGN KEY (visual_id) REFERENCES visuals(id) ON DELETE CASCADE
     );
 
-    CREATE INDEX IF NOT EXISTS idx_work_photos_work_id ON work_photos(work_id);
+    CREATE INDEX IF NOT EXISTS idx_visual_photos_visual_id ON visual_photos(visual_id);
     `
-	_, err = DB.Exec(createWorkPhotosTable)
+	_, err = DB.Exec(createVisualPhotosTable)
 	if err != nil {
-		log.Printf("configDatabase: %q: %s\n", err, createWorkPhotosTable)
+		log.Printf("configDatabase: %q: %s\n", err, createVisualPhotosTable)
+		return err
+	}
+
+	createInfoTable := `
+	  CREATE TABLE IF NOT EXISTS info (
+        singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+        
+        content TEXT NOT NULL,
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Initialize the single row
+    INSERT OR IGNORE INTO info (singleton, content) 
+    VALUES (1, 'Welcome to my Website');
+	`
+	_, err = DB.Exec(createInfoTable)
+	if err != nil {
+		log.Printf("configDatabase: %q: %s\n", err, createInfoTable)
 		return err
 	}
 
 	return nil
 }
 
-func getTexts(id ...int) ([]Text, error) {
+func getStories(id ...int) ([]Story, error) {
 	var query string
 	var args []any
 
-	query = "SELECT id, title, content, created_at FROM texts"
+	query = "SELECT id, title, content, created_at FROM stories"
 
 	if len(id) > 0 {
 		query += " WHERE id = $1"
@@ -687,34 +528,34 @@ func getTexts(id ...int) ([]Text, error) {
 	}
 	defer rows.Close()
 
-	var texts []Text
+	var stories []Story
 	var timestamp time.Time
 
 	for rows.Next() {
-		var t Text
+		var t Story
 		if err := rows.Scan(&t.ID, &t.Title, &t.Content, &timestamp); err != nil {
 			return nil, err
 		}
 		t.Timestamp = &timestamp
-		texts = append(texts, t)
+		stories = append(stories, t)
 	}
 
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
 
-	return texts, nil
+	return stories, nil
 }
 
-func getWorks(id ...int) ([]Work, error) {
+func getVisuals(id ...int) ([]Visual, error) {
 	var query string
 	var args []any
 
-	// Base query for works
+	// Base query for visuals
 	query = `
 				SELECT w.id, w.user_id, w.title, w.description, w.created_at, wp.file_path
-        FROM works w
-        LEFT JOIN work_photos wp ON w.id = wp.work_id
+        FROM visuals w
+        LEFT JOIN visual_photos wp ON w.id = wp.visual_id
     `
 
 	if len(id) > 0 {
@@ -724,33 +565,33 @@ func getWorks(id ...int) ([]Work, error) {
 
 	query += " ORDER BY w.created_at DESC;"
 
-	// Execute works query
+	// Execute visuals query
 	rows, err := DB.Query(query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("getWorks query failed: %v", err)
+		return nil, fmt.Errorf("getVisuals query failed: %v", err)
 	}
 	defer rows.Close()
 
-	var works []Work
+	var visuals []Visual
 	currentID := -1
 
 	for rows.Next() {
-		var w Work
+		var w Visual
 		var photo sql.NullString
 		err := rows.Scan(&w.ID, &w.UserID, &w.Title, &w.Description, &w.CreatedAt, &photo)
 		if err != nil {
-			return nil, fmt.Errorf("getWorks scan failed: %v", err)
+			return nil, fmt.Errorf("getVisuals scan failed: %v", err)
 		}
 
 		if currentID != w.ID {
-			works = append(works, w)
+			visuals = append(visuals, w)
 			currentID = w.ID
 		}
 		if photo.Valid {
-			works[len(works)-1].Photos = append(works[len(works)-1].Photos, photo.String)
+			visuals[len(visuals)-1].Photos = append(visuals[len(visuals)-1].Photos, photo.String)
 		}
 	}
-	return works, nil
+	return visuals, nil
 }
 
 func login(email string, password []byte) (*int, error) {
@@ -833,86 +674,84 @@ func insertUser(user User) error {
 	return nil
 }
 
-func insertWork(work Work) (int64, error) {
+func insertVisual(visual Visual) (int64, error) {
 	// Begin transaction
 	tx, err := DB.Begin()
 	if err != nil {
-		return 0, fmt.Errorf("insertWork (begin tx): %v", err)
+		return 0, fmt.Errorf("insertVisual (begin tx): %v", err)
 	}
 	defer tx.Rollback()
 
 	result, err := tx.Exec(
-		`INSERT INTO works (user_id, title, description) VALUES (?, ?, ?)`,
-		work.UserID, work.Title, work.Description,
+		`INSERT INTO visuals (user_id, title, description) VALUES (?, ?, ?)`,
+		visual.UserID, visual.Title, visual.Description,
 	)
 	if err != nil {
-		return 0, fmt.Errorf("insertWork (insert work): %v", err)
+		return 0, fmt.Errorf("insertVisual (insert visual): %v", err)
 	}
 
-	workID, err := result.LastInsertId()
+	visualID, err := result.LastInsertId()
 	if err != nil {
-		return 0, fmt.Errorf("insertWork (get ID): %v", err)
+		return 0, fmt.Errorf("insertVisual (get ID): %v", err)
 	}
 
-	if len(work.Photos) > 0 {
+	if len(visual.Photos) > 0 {
 		stmt, err := tx.Prepare(`
-            INSERT INTO work_photos (work_id, file_path)
+            INSERT INTO visual_photos (visual_id, file_path)
             VALUES (?, ?)
         `)
 		if err != nil {
-			return 0, fmt.Errorf("insertWork (prepare photo stmt): %v", err)
+			return 0, fmt.Errorf("insertVisual (prepare photo stmt): %v", err)
 		}
 		defer stmt.Close()
 
-		for _, path := range work.Photos {
-			if _, err = stmt.Exec(workID, path); err != nil {
-				return 0, fmt.Errorf("insertWork (insert photo %s): %v", path, err)
+		for _, path := range visual.Photos {
+			if _, err = stmt.Exec(visualID, path); err != nil {
+				return 0, fmt.Errorf("insertVisual (insert photo %s): %v", path, err)
 			}
 		}
 	}
 
-	// Commit
 	if err = tx.Commit(); err != nil {
-		return 0, fmt.Errorf("insertWork (commit): %v", err)
+		return 0, fmt.Errorf("insertVisual (commit): %v", err)
 	}
 
-	return workID, nil
+	return visualID, nil
 }
 
-func insertText(text Text) error {
+func insertStory(story Story) (int, error) {
 	sqlStmt := `
-		INSERT INTO texts (user_id, title, content) VALUES (?, ?, ?);
+		INSERT INTO stories (user_id, title, content) VALUES (?, ?, ?) RETURNING id;
 	`
-	_, err := DB.Exec(sqlStmt, text.UserID, text.Title, text.Content)
+	var id int
+	err := DB.QueryRow(sqlStmt, story.UserID, story.Title, story.Content).Scan(&id)
 	if err != nil {
-		return fmt.Errorf("insertText: %v", err)
+		return 0, fmt.Errorf("insertStory: %v", err)
 	}
-	return nil
+	return id, nil
 }
 
-func updateWork(work Work) error {
-	// Update works table
+func updateVisual(visual Visual) error {
 	_, err := DB.Exec(`
-        UPDATE works
+        UPDATE visuals
         SET title = ?, description = ?
         WHERE id = ?`,
-		work.Title, work.Description, work.ID)
+		visual.Title, visual.Description, visual.ID)
 	if err != nil {
 		return err
 	}
 
-	// Add new photos to work_photos
-	if len(work.Photos) > 0 {
+	if len(visual.Photos) > 0 {
 		stmt, err := DB.Prepare(`
-            INSERT INTO work_photos (work_id, file_path)
-            VALUES (?, ?)`)
+       INSERT INTO visual_photos (visual_id, file_path)
+       VALUES (?, ?)`)
 		if err != nil {
 			return err
 		}
 		defer stmt.Close()
 
-		for _, path := range work.Photos {
-			if _, err := stmt.Exec(work.ID, path); err != nil {
+		for _, path := range visual.Photos {
+			if _, err := stmt.Exec(visual.ID, path); err != nil {
 				return err
 			}
 		}
@@ -920,23 +759,45 @@ func updateWork(work Work) error {
 	return nil
 }
 
-func updateText(text Text) error {
+func updateStory(story Story) error {
 	sqlStmt := `
-      UPDATE texts
-      SET title = ?, content = ?
-      WHERE id = ? AND user_id = ?;
+       UPDATE stories
+       SET title = ?, content = ?
+       WHERE id = ? AND user_id = ?;
     `
-	result, err := DB.Exec(sqlStmt, text.Title, text.Content, text.ID, text.UserID)
+	result, err := DB.Exec(sqlStmt, story.Title, story.Content, story.ID, story.UserID)
 	if err != nil {
-		return fmt.Errorf("updateText: %v", err)
+		return fmt.Errorf("updateStory: %v", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("updateText (rows affected): %v", err)
+		return fmt.Errorf("updateStory (rows affected): %v", err)
 	}
 	if rowsAffected == 0 {
-		return fmt.Errorf("no rows updated - either text doesn't exist or user doesn't have permission")
+		return fmt.Errorf("no rows updated - either story doesn't exist or user doesn't have permission")
+	}
+
+	return nil
+}
+
+func updateInfo(info Info) error {
+	sqlStmt := `
+      UPDATE info 
+      SET content = ?, last_updated = CURRENT_TIMESTAMP
+      WHERE singleton = 1;
+    `
+	result, err := DB.Exec(sqlStmt, info.Content)
+	if err != nil {
+		return fmt.Errorf("updateInfo: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("updateStory (rows affected): %v", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("no rows updated - either story doesn't exist or user doesn't have permission")
 	}
 
 	return nil
@@ -953,75 +814,6 @@ func getLoginStatus(req *http.Request) (*int, bool) {
 		return nil, false
 	}
 	return &userId, true
-}
-
-func HandleFileUpload(r *http.Request, config FileUploadConfig) (string, error) {
-	// Parse the multipart form
-	if err := r.ParseMultipartForm(config.MaxSize); err != nil {
-		return "", fmt.Errorf("error parsing form data: %v", err)
-	}
-
-	// Get the file from the form
-	file, header, err := r.FormFile(config.FieldName)
-	if err != nil {
-		if errors.Is(err, http.ErrMissingFile) {
-			return "", nil // No file uploaded is not an error
-		}
-		return "", fmt.Errorf("error getting file from form: %v", err)
-	}
-	defer file.Close()
-
-	// Read the first 512 bytes to check MIME type
-	buffer := make([]byte, 512)
-	_, err = file.Read(buffer)
-	if err != nil {
-		return "", fmt.Errorf("error reading file for MIME type check: %v", err)
-	}
-
-	// Reset file pointer
-	if _, err = file.Seek(0, 0); err != nil {
-		return "", fmt.Errorf("error resetting file pointer: %v", err)
-	}
-
-	// Verify MIME type
-	mimeType := http.DetectContentType(buffer)
-	allowedTypes := config.AllowedTypes
-	if allowedTypes == nil {
-		allowedTypes = allowedMIMETypes
-	}
-
-	if !allowedTypes[mimeType] {
-		return "", fmt.Errorf("uploaded file type %s is not supported", mimeType)
-	}
-
-	// Handle special file types
-	if mimeType == "image/heic" {
-		return "", errors.New("HEIC conversion not implemented")
-	}
-
-	// Determine filename
-	filename := config.Filename
-	if filename == "" {
-		ext := filepath.Ext(header.Filename)
-		filename = fmt.Sprintf("%s%s", uuid.NewV4().String(), ext)
-	}
-
-	// Create destination directory if needed
-	if config.DestinationDir != "" {
-		if err := os.MkdirAll(config.DestinationDir, 0755); err != nil {
-			return "", fmt.Errorf("error creating destination directory: %v", err)
-		}
-	}
-
-	// Create full path
-	filePath := filepath.Join(config.DestinationDir, filename)
-
-	// Save the file
-	if err := saveFile(file, filePath); err != nil {
-		return "", fmt.Errorf("error saving file: %v", err)
-	}
-
-	return filePath, nil
 }
 
 func saveFile(src multipart.File, dstPath string) error {
@@ -1051,38 +843,131 @@ func sanitizeFilename(input string) string {
 	return output
 }
 
-func deleteWork(id int) error {
-    tx, err := DB.Begin()
-    if err != nil {
-        return err
-    }
-    defer tx.Rollback()
+func deleteVisual(id int) error {
+	tx, err := DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 
-		log.Printf("Attempt to delete work with id '%d'", id)
-    if _, err := tx.Exec(`DELETE FROM work_photos WHERE work_id = ?`, id); err != nil {
-				log.Printf("Failed to delete photos with work id '%d': %v", id, err)
-        return err
-    }
+	log.Printf("Attempt to delete visual with id '%d'", id)
+	if _, err := tx.Exec(`DELETE FROM visual_photos WHERE visual_id = ?`, id); err != nil {
+		log.Printf("Failed to delete photos with visual id '%d': %v", id, err)
+		return err
+	}
 
-    if _, err := tx.Exec(`DELETE FROM works WHERE id = ?`, id); err != nil {
-				log.Printf("Failed to delete work with id '%d': %v", id, err)
-        return err
-    }
+	if _, err := tx.Exec(`DELETE FROM visuals WHERE id = ?`, id); err != nil {
+		log.Printf("Failed to delete visual with id '%d': %v", id, err)
+		return err
+	}
 
-		if err := tx.Commit(); err != nil {
-				log.Printf("Failed to delete work with id '%d': %v", id, err)
-		    return err
+	if err := tx.Commit(); err != nil {
+		log.Printf("Failed to delete visual with id '%d': %v", id, err)
+		return err
+	}
+
+	log.Printf("Successfully deleted visual with id '%d'", id)
+	return nil
+}
+
+func storeFile(fileHeader *multipart.FileHeader, config FileUploadConfig) (string, error) {
+	file, err := fileHeader.Open()
+	if err != nil {
+		log.Printf("Error opening uploaded file: %v", err)
+		return "", err
+	}
+	defer file.Close()
+
+	buffer := make([]byte, 512)
+	_, err = file.Read(buffer)
+	if err != nil {
+		return "", fmt.Errorf("error reading file for MIME type check: %v", err)
+	}
+	mimeType := http.DetectContentType(buffer)
+	if !config.AllowedTypes[mimeType] {
+		return "", fmt.Errorf("uploaded file type %s is not supported", mimeType)
+	}
+
+	if _, err = file.Seek(0, 0); err != nil {
+		return "", fmt.Errorf("error resetting file pointer: %v", err)
+	}
+	filename := config.Filename
+	if filename == "" {
+		ext := filepath.Ext(fileHeader.Filename)
+		filename = fmt.Sprintf("%s%s", uuid.NewV4().String(), ext)
+	}
+	if config.DestinationDir != "" {
+		if err := os.MkdirAll(config.DestinationDir, 0755); err != nil {
+			return "", fmt.Errorf("error creating destination directory: %v", err)
 		}
+	}
+	filePath := filepath.Join(config.DestinationDir, filename)
+	if err := saveFile(file, filePath); err != nil {
+		return "", fmt.Errorf("error saving file: %v", err)
+	}
 
-		log.Printf("Successfully deleted work with id '%d'", id)
-    return nil
+	return strings.TrimPrefix(filePath, "data/serve"), nil
 }
 
-func cleanupWorkFiles(work Work) {
-    // Delete the entire work directory
-    safeTitle := sanitizeFilename(work.Title)
-    workDir := filepath.Join("./data/serve/work", safeTitle)
-    if err := os.RemoveAll(workDir); err != nil {
-        log.Printf("Error cleaning up work files: %v", err)
-    }
-}
+//	if req.Method == http.MethodPost {
+//		if !loggedIn {
+//			http.Error(w, "Unauthorized", http.StatusForbidden)
+//			return
+//		}
+//
+//		if req.FormValue("_method") == "DELETE" {
+//			if err := deleteVisual(visual.ID); err != nil {
+//				http.Error(w, "Failed to delete visual", http.StatusInternalServerError)
+//				log.Printf("Error deleting visual: %v", err)
+//				return
+//			}
+//			// Cleanup files
+//			go cleanupVisualFiles(visual)
+//			http.Redirect(w, req, "/visual", http.StatusSeeOther)
+//			return
+//		}
+//
+//		// Parse form (including multipart for potential new photos)
+//		if err := req.ParseMultipartForm(32 << 20); err != nil {
+//			http.Error(w, "Unable to parse form data", http.StatusBadRequest)
+//			return
+//		}
+//
+//		// Update basic fields
+//		updatedVisual := Visual{
+//			ID:          visual.ID,
+//			UserID:      visual.UserID, // Preserve original owner
+//			Title:       req.FormValue("title"),
+//			Description: req.FormValue("description"),
+//		}
+//
+//		// Process new file uploads if any
+//		if fileHeaders := req.MultipartForm.File["photos"]; len(fileHeaders) > 0 {
+//			newPaths, err := saveVisualPhotos(updatedVisual.Title, fileHeaders)
+//			if err != nil {
+//				http.Error(w, "Failed to save photos", http.StatusInternalServerError)
+//				log.Printf("Error saving photos: %v", err)
+//				return
+//			}
+//			updatedVisual.Photos = append(updatedVisual.Photos, newPaths...)
+//		}
+//
+//		// Update in database
+//		if err := updateVisual(updatedVisual); err != nil {
+//			http.Error(w, "Failed to update visual", http.StatusInternalServerError)
+//			log.Printf("Error updating visual: %v", err)
+//			return
+//		}
+//
+//		http.Redirect(w, req, req.URL.Path, http.StatusSeeOther)
+//		return
+//	}
+
+//func cleanupVisualFiles(visual Visual) {
+//    safeTitle := sanitizeFilename(visual.Title)
+//    visualDir := filepath.Join("./data/serve/visual", safeTitle)
+//    if err := os.RemoveAll(visualDir); err != nil {
+//        log.Printf("Error cleaning up visual files: %v", err)
+//    }
+//}
+//
