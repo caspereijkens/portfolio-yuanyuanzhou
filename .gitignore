@@ -3,4 +3,3 @@ go.sum
 archive
 sqlite.DB
 tmp
-data/serve

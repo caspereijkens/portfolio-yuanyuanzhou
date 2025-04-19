@@ -3,6 +3,13 @@
     {{ template "head" "Yuanyuan Zhou Text" }}
     <body>
         {{template "navbar" .Login }}
-        <img id="profile-image" src="/blob/profile.jpg" alt="Profile Image">
+        <img src="/fs/{{.Cover.FilePath}}" alt="Cover image">
+        {{if .Login}}
+        <h2>Upload New Cover</h2>
+        <form action="/" method="POST" enctype="multipart/form-data">
+            <input type="file" name="cover" accept="image/*" required>
+            <button type="submit">Upload</button>
+        </form>
+        {{end}}
     </body>
 </html>

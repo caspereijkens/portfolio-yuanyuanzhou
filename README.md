@@ -1,5 +1,5 @@
 # portfolio-yuanyuanzhou
-Performant and secure app to host an artist portfolio. All code in a single `main.go`, under 1000 LoC.
+Performant and secure multiplexer to serve an artist portfolio. All code in a single `main.go`, under 1000 LoC.
 
 ## Workflow
 1. Make changes to code.
