@@ -34,13 +34,16 @@ var allowedImageMIMETypes = map[string]bool{
 
 const localFSDir = "data/serve"
 
-
 type User struct {
 	Email          string
 	PasswordDigest []byte
 }
 
 type Cover struct {
+	FilePath string
+}
+
+type Portfolio struct {
 	FilePath string
 }
 
@@ -78,6 +81,11 @@ type infoData struct {
   Info Info
 }
 
+type portfolioData struct {
+	Login bool
+	Portfolio Portfolio
+}
+
 type listStoryData struct {
 	Login   bool
 	Stories []Story
@@ -112,15 +120,15 @@ func landingPageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodGet:
-		handleGetLanding(w, r)
+		handleGetIndex(w, r)
 	case http.MethodPost:
-		handlePostLanding(w, r)
+		handlePostIndex(w, r)
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	} 
 }
 
-func handleGetLanding(w http.ResponseWriter, r *http.Request) {
+func handleGetIndex(w http.ResponseWriter, r *http.Request) {
   filePath, err := getLatestCoverPath()
 	if err != nil {
 		http.Error(w, "Failed to fetch cover data", http.StatusInternalServerError)
@@ -136,7 +144,7 @@ func handleGetLanding(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handlePostLanding(w http.ResponseWriter, r *http.Request) {
+func handlePostIndex(w http.ResponseWriter, r *http.Request) {
     err := r.ParseMultipartForm(2 << 20)
     if err != nil {
         http.Error(w, "Failed to parse form", http.StatusBadRequest)
@@ -333,7 +341,7 @@ func handlePatchStory(w http.ResponseWriter, r *http.Request) {
         return
     }
     
-    http.Redirect(w, r, fmt.Sprintf("/story/%d", storyID), http.StatusSeeOther)
+    http.Redirect(w, r, fmt.Sprintf("/stories/%d", storyID), http.StatusSeeOther)
 }
 
 func handleDeleteStory(w http.ResponseWriter, r *http.Request) {
@@ -350,6 +358,72 @@ func handleDeleteStory(w http.ResponseWriter, r *http.Request) {
     }
     
     http.Redirect(w, r, "/stories", http.StatusSeeOther)
+}
+
+func portfolioHandler(w http.ResponseWriter, r *http.Request) {
+    switch r.Method {
+    case http.MethodGet:
+		  handleGetPortfolio(w, r) 
+    case http.MethodPost:
+			handlePostPortfolio(w, r)
+    default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+    }
+}
+
+func handleGetPortfolio(w http.ResponseWriter, r *http.Request) {
+  filePath, err := getLatestPortfolioPath()
+	if err != nil {
+		http.Error(w, "Failed to fetch cover data", http.StatusInternalServerError)
+		return
+	}
+	portfolio := Portfolio{
+		FilePath: filePath,
+	}
+	_, loggedIn := getLoginStatus(r)
+	err = TPL.ExecuteTemplate(w, "portfolio.gohtml", portfolioData{Login: loggedIn, Portfolio: portfolio})
+	if err != nil {
+		http.Error(w, "Template error", http.StatusInternalServerError)
+	}
+}
+
+func handlePostPortfolio(w http.ResponseWriter, r *http.Request) {
+    err := r.ParseMultipartForm(10 << 20)
+    if err != nil {
+        http.Error(w, "Failed to parse form", http.StatusBadRequest)
+        return
+    }
+
+    file, fileHeader, err := r.FormFile("portfolio")
+    if err != nil {
+        http.Error(w, "No file uploaded", http.StatusBadRequest)
+        return
+    }
+    file.Close()
+
+		contentType := fileHeader.Header.Get("Content-Type")
+	  if !strings.HasPrefix(contentType, "application/pdf") {
+		  http.Error(w, fmt.Sprintf("uploaded file type %s is not supported", contentType), http.StatusBadRequest)
+		  return  
+    }
+
+    filePath, err := storeFile(fileHeader, FileUploadConfig{
+			AllowedTypes: map[string]bool{"application/pdf": true},
+			DestinationDir: fmt.Sprintf("./%s/portfolios", localFSDir),
+			MaxSize:        10_000_000,
+		})
+    if err != nil {
+        http.Error(w, "Failed to save file", http.StatusInternalServerError)
+        return
+    }
+
+    _, err = DB.Exec("INSERT INTO portfolios (file_path) VALUES (?)", filePath)
+    if err != nil {
+        http.Error(w, "Failed to update database", http.StatusInternalServerError)
+        return
+    }
+
+    http.Redirect(w, r, "/portfolio", http.StatusSeeOther)
 }
 
 //func post(w http.ResponseWriter, req *http.Request, typeParam string) {
@@ -531,10 +605,10 @@ func main() {
 	mux.HandleFunc("/info", requireAuthUnlessGet(infoHandler))
 	mux.HandleFunc("/login", loginHandler)
 	mux.HandleFunc("/logout", requireAuthUnlessGet(logoutHandler))
+	mux.HandleFunc("/portfolio", requireAuthUnlessGet(portfolioHandler))
 	mux.Handle("/fs/", fileHandler)
 	mux.Handle("/favicon.ico", http.NotFoundHandler())
 	mux.Handle("/robots.txt", AddPrefixHandler("/fs", fileHandler))
-	mux.Handle("/portfolio.pdf", AddPrefixHandler("/fs", fileHandler))
 	mux.HandleFunc("/style.css", styleSheetHandler)
 
 	srv := &http.Server{

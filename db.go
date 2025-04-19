@@ -125,6 +125,35 @@ func configDatabase() error {
           return fmt.Errorf("failed to insert default cover: %w", err)
       }
   }
+
+	createPortfoliosTable := `
+    CREATE TABLE IF NOT EXISTS portfolios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_path TEXT NOT NULL UNIQUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    `
+	_, err = DB.Exec(createPortfoliosTable)
+	if err != nil {
+		log.Printf("configDatabase: %q: %s\n", err, createPortfoliosTable)
+		return err
+	}
+
+  err = DB.QueryRow("SELECT COUNT(*) FROM portfolios").Scan(&count)
+  if err != nil {
+      return fmt.Errorf("failed to check covers count: %w", err)
+  }
+
+  if count == 0 {
+      defaultPath := "portfolios/portfolio.pdf"
+      _, err = DB.Exec(
+          "INSERT INTO portfolios (file_path) VALUES (?)",
+          defaultPath,
+      )
+      if err != nil {
+          return fmt.Errorf("failed to insert default portfolio: %w", err)
+      }
+  }
 	return nil
 }
 
@@ -248,3 +277,13 @@ func updateStory(story Story) error {
 
 	return nil
 }
+
+func getLatestPortfolioPath() (string, error) {
+	var filePath string
+	err := DB.QueryRow("SELECT file_path FROM portfolios ORDER BY created_at DESC LIMIT 1").Scan(&filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to get latest portfolio: %w", err)
+	}
+	return filePath, nil
+}
+
