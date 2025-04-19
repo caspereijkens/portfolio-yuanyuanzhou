@@ -10,26 +10,27 @@
     <div>{{.Story.Content}}</div>
     {{ if .Login }}
     <div>
-    <form action="/patch?type=story" method="PATCH">
-        <h2>Edit Story</h2>
+    <h2>Edit Story</h2>
+    <form action="/stories/{{ .Story.ID }}" method="POST">
+        <input type="hidden" name="_method" value="PATCH">
         <input type="hidden" name="id" value="{{.Story.ID}}">
-
         <div>
-            <label>Title:</label><br>
-            <input type="text" name="title" value="{{.Story.Title}}" required>
+        <input type="text" name="title" value="{{.Story.Title}}" required>
         </div>
-
         <div>
-            <label>Content:</label><br>
-            <textarea name="content" required>{{.Story.Content}}</textarea>
+        <textarea name="content" required>{{.Story.Content}}</textarea>
         </div>
-
         <div>
-            <button type="submit">Save Changes</button>
-            <a href="/stories">Cancel</a>
+        <button type="submit">Save Changes</button>
         </div>
     </form>
     </div>
+    <div>
+      <form action="/stories/{{ .Story.ID }}" method="POST" onsubmit="return confirm('Are you sure?')">
+            <input type="hidden" name="_method" value="DELETE">
+            <input type="hidden" name="id" value="{{.Story.ID}}">
+            <button type="submit" class="danger">Delete Story</button>
+        </form>
     {{ end }}
 </body>
 </html>

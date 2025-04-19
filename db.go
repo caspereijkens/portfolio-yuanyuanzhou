@@ -5,6 +5,7 @@ import (
 	"log"
 	_ "github.com/mattn/go-sqlite3"
 	"fmt"
+	"time"
 )
 
 var DB *sql.DB
@@ -26,16 +27,13 @@ func configDatabase() error {
 	createStoryTable := `
     CREATE TABLE IF NOT EXISTS stories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
         title TEXT NOT NULL,
         content TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id),
-        UNIQUE(user_id, title)
+        UNIQUE(title)
     );
     
-    CREATE INDEX IF NOT EXISTS idx_stories_user_id ON stories(user_id);
     CREATE INDEX IF NOT EXISTS idx_stories_created_at ON stories(created_at);
     `
 	_, err = DB.Exec(createStoryTable)
@@ -178,3 +176,75 @@ func updateInfo(info Info) error {
 	return nil
 }
 
+func getStories(id ...int) ([]Story, error) {
+	var query string
+	var args []any
+
+	query = "SELECT id, title, content, created_at FROM stories"
+
+	if len(id) > 0 {
+		query += " WHERE id = $1"
+		args = append(args, id[0])
+	}
+
+	query += " ORDER BY created_at DESC;"
+
+	rows, err := DB.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var stories []Story
+	var timestamp time.Time
+
+	for rows.Next() {
+		var t Story
+		if err := rows.Scan(&t.ID, &t.Title, &t.Content, &timestamp); err != nil {
+			return nil, err
+		}
+		t.Timestamp = &timestamp
+		stories = append(stories, t)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return stories, nil
+}
+
+func insertStory(story Story) (int, error) {
+	sqlStmt := `
+		INSERT INTO stories (title, content) VALUES (?, ?) RETURNING id;
+	`
+	var id int
+	err := DB.QueryRow(sqlStmt, story.Title, story.Content).Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("insertStory: %v", err)
+	}
+	return id, nil
+}
+
+
+func updateStory(story Story) error {
+	sqlStmt := `
+       UPDATE stories
+       SET title = ?, content = ?
+       WHERE id = ?;
+    `
+	result, err := DB.Exec(sqlStmt, story.Title, story.Content, story.ID)
+	if err != nil {
+		return fmt.Errorf("updateStory: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("updateStory (rows affected): %v", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("no rows updated - either story doesn't exist or user doesn't have permission")
+	}
+
+	return nil
+}

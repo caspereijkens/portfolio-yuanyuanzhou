@@ -11,6 +11,7 @@ import (
 	"io"
 	"strings"
 	"time"
+	"strconv"
 
 	"net/http"
 
@@ -43,13 +44,12 @@ type Cover struct {
 	FilePath string
 }
 
-//type Story struct {
-//	ID        int
-//	UserID    int
-//	Title     string
-//	Content   string
-//	Timestamp *time.Time
-//}
+type Story struct {
+	ID        int
+	Title     string
+	Content   string
+	Timestamp *time.Time
+}
 
 type Info struct {
 	Content   string
@@ -78,21 +78,21 @@ type infoData struct {
   Info Info
 }
 
-//type listStoryData struct {
-//	Login   bool
-//	Stories []Story
-//}
-//
+type listStoryData struct {
+	Login   bool
+	Stories []Story
+}
+
 //type listVisualData struct {
 //	Login   bool
 //	Visuals []Visual
 //}
-//
-//type storyData struct {
-//	Login bool
-//	Story Story
-//}
-//
+
+type storyData struct {
+	Login bool
+	Story Story
+}
+
 //type visualData struct {
 //	Login  bool
 //	Visual Visual
@@ -175,15 +175,6 @@ func handlePostLanding(w http.ResponseWriter, r *http.Request) {
     http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-//func infoHandler(w http.ResponseWriter, req *http.Request) {
-//	_, loggedIn := getLoginStatus(req)
-//
-//	err := TPL.ExecuteTemplate(w, "info.gohtml", loginData{Login: loggedIn})
-//	if err != nil {
-//		http.Error(w, "Failed to render template", http.StatusInternalServerError)
-//	}
-//}
-//
 func infoHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -229,28 +220,138 @@ func handlePatchInfo(w http.ResponseWriter, r *http.Request) {
     http.Redirect(w, r, "/info", http.StatusSeeOther)
 }
 
-////func postHandler(w http.ResponseWriter, req *http.Request) {
-////	_, loggedIn := getLoginStatus(req)
-////
-////	if req.Method == http.MethodPost {
-////		if !loggedIn {
-////			http.Error(w, "Unauthorized", http.StatusForbidden)
-////			return
-////		}
-////
-////		queryParams, err := url.ParseQuery(req.URL.RawQuery)
-////		if err != nil {
-////			log.Printf("Error parsing query: %v", err)
-////			http.Error(w, "Malformatted URL in request", http.StatusBadRequest)
-////			return
-////		}
-////		typeParam := queryParams.Get("type")
-////		post(w, req, typeParam)
-////	}
-////
-////	return
-////}
-//
+func listStoriesHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		handleListStories(w, r)
+	case http.MethodPost:
+		handlePostStories(w, r)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	} 
+}
+
+func handleListStories(w http.ResponseWriter, req *http.Request) {
+	stories, err := getStories()
+	if err != nil {
+		http.Error(w, "Failed to retrieve stories", http.StatusInternalServerError)
+		log.Printf("Error retrieving stories: %v", err)
+		return
+	}
+
+	_, loggedIn := getLoginStatus(req)
+	err = TPL.ExecuteTemplate(w, "stories.gohtml", listStoryData{Login: loggedIn, Stories: stories})
+	if err != nil {
+		http.Error(w, "Template error", http.StatusInternalServerError)
+	}
+}	
+
+func handlePostStories(w http.ResponseWriter, r *http.Request) {
+    if err := r.ParseForm(); err != nil {
+        http.Error(w, "Bad request", http.StatusBadRequest)
+        return
+    }
+
+    title := r.FormValue("title")
+    content := r.FormValue("content")
+    if title == "" || content == "" {
+        http.Error(w, "Title and content are required", http.StatusBadRequest)
+        return
+    }
+
+    story := Story{
+        Title:   title,
+        Content: content,
+    }
+
+    id, err := insertStory(story)
+    if err != nil {
+        http.Error(w, "Failed to save story", http.StatusInternalServerError)
+        log.Printf("Error inserting story: %v", err)
+        return
+    }
+
+    http.Redirect(w, r, fmt.Sprintf("/stories/%d", id), http.StatusSeeOther)
+}
+
+func storiesHandler(w http.ResponseWriter, r *http.Request) {
+    switch r.Method {
+    case http.MethodGet:
+		  handleGetStory(w, r) 
+    case http.MethodPatch:
+			handlePatchStory(w, r)
+    case http.MethodDelete:
+			handleDeleteStory(w, r)
+    default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+    }
+}
+
+func handleGetStory(w http.ResponseWriter, req *http.Request) {
+	idStr := strings.TrimPrefix(req.URL.Path, "/stories/")
+
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Redirect(w, req, "/stories", http.StatusSeeOther)
+		return
+	}
+
+	stories, err := getStories(id)
+	if err != nil {
+		log.Printf("Error retrieving stories: %v", err)
+		http.Error(w, "Failed to retrieve stories", http.StatusInternalServerError)
+		return
+	}
+
+	story := stories[0]
+	_, loggedIn := getLoginStatus(req)
+	err = TPL.ExecuteTemplate(w, "story.gohtml", storyData{Login: loggedIn, Story: story})
+	if err != nil {
+		http.Error(w, "Template error", http.StatusInternalServerError)
+	}
+}
+
+func handlePatchStory(w http.ResponseWriter, r *http.Request) {
+    if err := r.ParseForm(); err != nil {
+        http.Error(w, "Bad request", http.StatusBadRequest)
+        return
+    }
+    
+    storyID, err := strconv.Atoi(r.FormValue("id"))
+    if err != nil {
+        http.Error(w, "Invalid story ID", http.StatusBadRequest)
+        return
+    }
+		story := Story{
+			ID: storyID,
+      Title: r.FormValue("title"), 	
+			Content: r.FormValue("content"),
+		}
+    err = updateStory(story)  
+    if err != nil {
+        http.Error(w, "Failed to update story", http.StatusInternalServerError)
+        return
+    }
+    
+    http.Redirect(w, r, fmt.Sprintf("/story/%d", storyID), http.StatusSeeOther)
+}
+
+func handleDeleteStory(w http.ResponseWriter, r *http.Request) {
+    storyID, err := strconv.Atoi(r.FormValue("id"))
+    if err != nil {
+        http.Error(w, "Invalid story ID", http.StatusBadRequest)
+        return
+    }
+    
+    _, err = DB.Exec("DELETE FROM stories WHERE id = ?", storyID)
+    if err != nil {
+        http.Error(w, "Failed to delete story", http.StatusInternalServerError)
+        return
+    }
+    
+    http.Redirect(w, r, "/stories", http.StatusSeeOther)
+}
+
 //func post(w http.ResponseWriter, req *http.Request, typeParam string) {
 //	userID, _ := getLoginStatus(req)
 //
@@ -304,31 +405,6 @@ func handlePatchInfo(w http.ResponseWriter, r *http.Request) {
 //			return
 //		}
 //		http.Redirect(w, req, fmt.Sprintf("/visual/%d", id), http.StatusSeeOther)
-//	case "story":
-//		story := Story{
-//			UserID:  *userID,
-//			Title:   req.FormValue("title"),
-//			Content: req.FormValue("content"),
-//		}
-//		id, err := insertStory(story)
-//		if err != nil {
-//			http.Error(w, "Failed to save story", http.StatusInternalServerError)
-//			log.Printf("Error inserting story: %v", err)
-//			return
-//		}
-//		http.Redirect(w, req, fmt.Sprintf("/story/%d", id), http.StatusSeeOther)
-//	case "info":
-//		info := Info{
-//			UserID:  *userID,
-//			Content: req.FormValue("content"),
-//		}
-//		err := updateInfo(info)
-//		if err != nil {
-//			http.Error(w, "Failed to save info", http.StatusInternalServerError)
-//			log.Printf("Error inserting info: %v", err)
-//			return
-//		}
-//		http.Redirect(w, req, "/info", http.StatusSeeOther)
 //	case "portfolio":
 //		_, header, err := req.FormFile("file")
 //		if err != nil {
@@ -354,21 +430,6 @@ func handlePatchInfo(w http.ResponseWriter, r *http.Request) {
 //	}
 //}
 //
-//func listStoriesHandler(w http.ResponseWriter, req *http.Request) {
-//	_, loggedIn := getLoginStatus(req)
-//
-//	stories, err := getStories()
-//	if err != nil {
-//		http.Error(w, "Failed to retrieve stories", http.StatusInternalServerError)
-//		log.Printf("Error retrieving stories: %v", err)
-//		return
-//	}
-//
-//	err = TPL.ExecuteTemplate(w, "stories.gohtml", listStoryData{Login: loggedIn, Stories: stories})
-//	if err != nil {
-//		http.Error(w, "Template error", http.StatusInternalServerError)
-//	}
-//}
 //
 //func listVisualsHandler(w http.ResponseWriter, req *http.Request) {
 //	_, loggedIn := getLoginStatus(req)
@@ -420,30 +481,6 @@ func handlePatchInfo(w http.ResponseWriter, r *http.Request) {
 //	}
 //}
 //
-//func storiesHandler(w http.ResponseWriter, req *http.Request) {
-//	idStr := strings.TrimPrefix(req.URL.Path, "/story/")
-//
-//	id, err := strconv.Atoi(idStr)
-//	if err != nil {
-//		http.Redirect(w, req, "/stories", http.StatusSeeOther)
-//		return
-//	}
-//
-//	stories, err := getStories(id)
-//	if err != nil {
-//		log.Printf("Error retrieving stories: %v", err)
-//		http.Error(w, "Failed to retrieve stories", http.StatusInternalServerError)
-//		return
-//	}
-//
-//	story := stories[0]
-//	_, loggedIn := getLoginStatus(req)
-//	err = TPL.ExecuteTemplate(w, "story.gohtml", storyData{Login: loggedIn, Story: story})
-//	if err != nil {
-//		http.Error(w, "Template error", http.StatusInternalServerError)
-//	}
-//}
-//
 func loginHandler(w http.ResponseWriter, req *http.Request) {
 	_, loggedIn := getLoginStatus(req)
 	if loggedIn {
@@ -487,8 +524,8 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", requireAuthUnlessGet(landingPageHandler))
-//	mux.HandleFunc("/stories",  requireAuthUnlessGet(listStoriesHandler))
-//	mux.HandleFunc("/stories/",  requireAuthUnlessGet(storiesHandler))
+	mux.HandleFunc("/stories",  requireAuthUnlessGet(listStoriesHandler))
+	mux.HandleFunc("/stories/",  methodOverride(requireAuthUnlessGet(storiesHandler)))
 //	mux.HandleFunc("/visuals", requireAuthUnlessGet(listVisualsHandler))
 //	mux.HandleFunc("/visuals/", requireAuthUnlessGet(visualsHandler))
 	mux.HandleFunc("/info", requireAuthUnlessGet(infoHandler))
@@ -536,44 +573,22 @@ func requireAuthUnlessGet(next http.HandlerFunc) http.HandlerFunc {
     }
 }
 
+func methodOverride(next http.HandlerFunc) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        if r.Method == http.MethodPost {
+            switch method := r.PostFormValue("_method"); method {
+            case "PATCH":
+                r.Method = http.MethodPatch
+            case "DELETE":
+                r.Method = http.MethodDelete
+            case "PUT":
+                r.Method = http.MethodPut
+            }
+        }
+        next(w, r)
+    }
+}
 
-//func getStories(id ...int) ([]Story, error) {
-//	var query string
-//	var args []any
-//
-//	query = "SELECT id, title, content, created_at FROM stories"
-//
-//	if len(id) > 0 {
-//		query += " WHERE id = $1"
-//		args = append(args, id[0])
-//	}
-//
-//	query += " ORDER BY created_at DESC;"
-//
-//	rows, err := DB.Query(query, args...)
-//	if err != nil {
-//		return nil, err
-//	}
-//	defer rows.Close()
-//
-//	var stories []Story
-//	var timestamp time.Time
-//
-//	for rows.Next() {
-//		var t Story
-//		if err := rows.Scan(&t.ID, &t.Title, &t.Content, &timestamp); err != nil {
-//			return nil, err
-//		}
-//		t.Timestamp = &timestamp
-//		stories = append(stories, t)
-//	}
-//
-//	if err = rows.Err(); err != nil {
-//		return nil, err
-//	}
-//
-//	return stories, nil
-//}
 //
 //func getVisuals(id ...int) ([]Visual, error) {
 //	var query string
@@ -736,18 +751,6 @@ func deleteSession(req *http.Request) *http.Cookie {
 //	return visualID, nil
 //}
 //
-//func insertStory(story Story) (int, error) {
-//	sqlStmt := `
-//		INSERT INTO stories (user_id, title, content) VALUES (?, ?, ?) RETURNING id;
-//	`
-//	var id int
-//	err := DB.QueryRow(sqlStmt, story.UserID, story.Title, story.Content).Scan(&id)
-//	if err != nil {
-//		return 0, fmt.Errorf("insertStory: %v", err)
-//	}
-//	return id, nil
-//}
-//
 //func updateVisual(visual Visual) error {
 //	_, err := DB.Exec(`
 //        UPDATE visuals
@@ -776,27 +779,6 @@ func deleteSession(req *http.Request) *http.Cookie {
 //	return nil
 //}
 //
-//func updateStory(story Story) error {
-//	sqlStmt := `
-//       UPDATE stories
-//       SET title = ?, content = ?
-//       WHERE id = ? AND user_id = ?;
-//    `
-//	result, err := DB.Exec(sqlStmt, story.Title, story.Content, story.ID, story.UserID)
-//	if err != nil {
-//		return fmt.Errorf("updateStory: %v", err)
-//	}
-//
-//	rowsAffected, err := result.RowsAffected()
-//	if err != nil {
-//		return fmt.Errorf("updateStory (rows affected): %v", err)
-//	}
-//	if rowsAffected == 0 {
-//		return fmt.Errorf("no rows updated - either story doesn't exist or user doesn't have permission")
-//	}
-//
-//	return nil
-//}
 //
 
 func getLoginStatus(req *http.Request) (*int, bool) {
