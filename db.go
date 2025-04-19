@@ -138,3 +138,43 @@ func getLatestCoverPath() (string, error) {
 	}
 	return filePath, nil
 }
+
+func getInfo() (Info, error) {
+    const query = `
+    SELECT content 
+    FROM info 
+    WHERE singleton = 1
+    `
+    
+    var info Info
+    
+    err := DB.QueryRow(query).Scan(&info.Content)
+    if err != nil {
+        return Info{}, fmt.Errorf("failed to get info: %w", err)
+    }
+    
+    return info, nil
+}
+
+func updateInfo(info Info) error {
+	sqlStmt := `
+      UPDATE info 
+      SET content = ?, last_updated = CURRENT_TIMESTAMP
+      WHERE singleton = 1;
+    `
+	result, err := DB.Exec(sqlStmt, info.Content)
+	if err != nil {
+		return fmt.Errorf("updateInfo: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("updateStory (rows affected): %v", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("no rows updated - either story doesn't exist or user doesn't have permission")
+	}
+
+	return nil
+}
+

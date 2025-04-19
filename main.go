@@ -50,15 +50,11 @@ type Cover struct {
 //	Content   string
 //	Timestamp *time.Time
 //}
-//
-//type Info struct {
-//	ID        int
-//	UserID    int
-//	Title     string
-//	Content   string
-//	Timestamp *time.Time
-//}
-//
+
+type Info struct {
+	Content   string
+}
+
 //type Visual struct {
 //	ID          int       `db:"id"`
 //	UserID      int       `db:"user_id"`
@@ -76,6 +72,12 @@ type coverData struct {
 	Login bool
 	Cover Cover
 }
+
+type infoData struct {
+	Login bool
+  Info Info
+}
+
 //type listStoryData struct {
 //	Login   bool
 //	Stories []Story
@@ -122,6 +124,7 @@ func handleGetLanding(w http.ResponseWriter, r *http.Request) {
   filePath, err := getLatestCoverPath()
 	if err != nil {
 		http.Error(w, "Failed to fetch cover data", http.StatusInternalServerError)
+		return
 	}
 	cover := Cover{
 		FilePath: filePath,
@@ -181,6 +184,51 @@ func handlePostLanding(w http.ResponseWriter, r *http.Request) {
 //	}
 //}
 //
+func infoHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		handleGetInfo(w, r)
+	case http.MethodPost:
+		handlePatchInfo(w, r)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	} 
+}
+
+func handleGetInfo(w http.ResponseWriter, r *http.Request) {
+  info, err := getInfo()
+	if err != nil {
+		http.Error(w, "Failed to fetch cover data", http.StatusInternalServerError)
+		return
+	}
+	_, loggedIn := getLoginStatus(r)
+	err = TPL.ExecuteTemplate(w, "info.gohtml", infoData{Login: loggedIn, Info: info})
+	if err != nil {
+		http.Error(w, "Failed to render template", http.StatusInternalServerError)
+	}
+}
+
+func handlePatchInfo(w http.ResponseWriter, r *http.Request) {
+    if err := r.ParseForm(); err != nil {
+        http.Error(w, "Bad request", http.StatusBadRequest)
+        return
+    }
+
+    content := r.FormValue("content")
+    if content == "" {
+        http.Error(w, "Content cannot be empty", http.StatusBadRequest)
+        return
+    }
+
+		err := updateInfo(Info{Content: content})
+    if err != nil {
+        http.Error(w, "Failed to update info", http.StatusInternalServerError)
+        return
+    }
+
+    http.Redirect(w, r, "/info", http.StatusSeeOther)
+}
+
 ////func postHandler(w http.ResponseWriter, req *http.Request) {
 ////	_, loggedIn := getLoginStatus(req)
 ////
@@ -443,7 +491,7 @@ func main() {
 //	mux.HandleFunc("/stories/",  requireAuthUnlessGet(storiesHandler))
 //	mux.HandleFunc("/visuals", requireAuthUnlessGet(listVisualsHandler))
 //	mux.HandleFunc("/visuals/", requireAuthUnlessGet(visualsHandler))
-//	mux.HandleFunc("/info", requireAuthUnlessGet(infoHandler))
+	mux.HandleFunc("/info", requireAuthUnlessGet(infoHandler))
 	mux.HandleFunc("/login", loginHandler)
 	mux.HandleFunc("/logout", requireAuthUnlessGet(logoutHandler))
 	mux.Handle("/fs/", fileHandler)
@@ -750,27 +798,6 @@ func deleteSession(req *http.Request) *http.Cookie {
 //	return nil
 //}
 //
-//func updateInfo(info Info) error {
-//	sqlStmt := `
-//      UPDATE info 
-//      SET content = ?, last_updated = CURRENT_TIMESTAMP
-//      WHERE singleton = 1;
-//    `
-//	result, err := DB.Exec(sqlStmt, info.Content)
-//	if err != nil {
-//		return fmt.Errorf("updateInfo: %v", err)
-//	}
-//
-//	rowsAffected, err := result.RowsAffected()
-//	if err != nil {
-//		return fmt.Errorf("updateStory (rows affected): %v", err)
-//	}
-//	if rowsAffected == 0 {
-//		return fmt.Errorf("no rows updated - either story doesn't exist or user doesn't have permission")
-//	}
-//
-//	return nil
-//}
 
 func getLoginStatus(req *http.Request) (*int, bool) {
 	cookie, err := req.Cookie("session")
