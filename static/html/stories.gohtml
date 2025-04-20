@@ -1,17 +1,17 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 {{ template "head" "Yuanyuan Zhou Story" }}
     <body>
         <h1>Yuanyuan Zhou</h1>
 <pre>
 <a href="/">..</a>
 {{ range .Stories -}}
-<a href="/stories/{{ .ID }}">{{ .Timestamp.Format "Jan _2 15:04"}} {{.Title}}</a>
+<a href="/stories/{{ .ID }}">{{ .CreatedAt.Format "Jan _2 15:04"}} {{.Title}}</a>
 {{ end -}}
 </pre>
         <hr>
         {{if .Login}}
-        <div>
+        <div class="upload-section"> 
             <h2>Add New Story</h2>
             <form action="/stories" method="POST">
                 <div>
