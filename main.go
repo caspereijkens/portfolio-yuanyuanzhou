@@ -39,7 +39,7 @@ type Story struct {
 	ID        int
 	Title     string
 	Content   string
-	Timestamp *time.Time
+	CreatedAt time.Time
 }
 
 type Info struct {

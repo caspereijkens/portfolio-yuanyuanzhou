@@ -1,9 +1,12 @@
+<!DOCTYPE html>
+<html lang="en">
 {{ template "head" .Visual.Title }}
 <body>
     {{ template "navbar" .Login }}
 
     {{ if .Login }}
-    <form action="/visuals/{{ .Visual.ID }}" method="POST" enctype="multipart/form-data">
+    <div class="upload-section">
+        <form id="uploadForm" action="/visuals/{{ .Visual.ID }}" method="POST" enctype="multipart/form-data">
             <input type="hidden" name="_method" value="PATCH">
             <input type="hidden" name="id" value="{{.Visual.ID}}">
 
@@ -19,11 +22,27 @@
 
             <div>
                 <label>Add More Photos:</label>
-                <input type="file" name="photos" multiple accept="image/jpeg,image/png,image/webp">
+                <input 
+                    type="file" 
+                    id="photos" 
+                    name="photos" 
+                    multiple 
+                    accept="image/*,.heic,.heif"
+                >
+                <div id="fileInfo">
+                    <span id="fileCount">0 files selected</span>
+                    <span id="totalSize">0 MB</span>
+                </div>
+                <div id="preview" style="display: flex; gap: 10px; margin-top: 10px;"></div>
+                <div id="uploadProgress" style="display: none;">
+                    <progress value="0" max="100"></progress>
+                    <span id="progressText">0%</span>
+                </div>
+                <div id="errorMessage" style="color: red;"></div>
                 <small>Max 10MB per file</small>
             </div>
             <div>
-                <button type="submit">Save Changes</button>
+                <button type="submit" id="submitBtn">Save Changes</button>
             </div>
         </form>
         <form action="/visuals/{{ .Visual.ID }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this work?')">
@@ -31,25 +50,22 @@
             <input type="hidden" name="id" value="{{.Visual.ID}}">
             <button type="submit">Delete Visual</button>
         </form>
+    </div>
     {{ end }}
+
     <article>
         <h1>{{ .Visual.Title }}</h1>
         <time>{{ .Visual.CreatedAt.Format "2006-01-02" }}</time>
-
         <div>{{ .Visual.Description }}</div>
-
         <div>
             {{ range .Visual.Photos }}
             <img src="/fs/{{ . }}" alt="{{ . }}">
             {{ end }}
         </div>
     </article>
+
+    {{ if .Login }}
+        {{ template "browser-image-compression-script" }}
+    {{ end }}
 </body>
-<script>
-    function confirmDelete() {
-        if (confirm('Are you sure you want to delete this work?')) {
-            document.getElementById('method-field').value = 'DELETE';
-            document.querySelector('.work-form').submit();
-        }
-    }
-</script>
+</html>

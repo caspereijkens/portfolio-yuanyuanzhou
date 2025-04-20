@@ -231,7 +231,7 @@ func getStories(id ...int) ([]Story, error) {
 		if err := rows.Scan(&t.ID, &t.Title, &t.Content, &timestamp); err != nil {
 			return nil, err
 		}
-		t.Timestamp = &timestamp
+		t.CreatedAt = timestamp
 		stories = append(stories, t)
 	}
 

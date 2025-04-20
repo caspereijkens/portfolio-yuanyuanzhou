@@ -1,25 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Viewer</title>
-    <style>
-        body {
-            margin: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        iframe {
-            flex: 1;
-            border: none;
-        }
-    </style>
-</head>
+{{ template "head" "Yuanyuan Zhou Portfolio" }}
 <body>
     {{ if .Login }}
-    <div>
+    <div class="upload-section">
         <h2>Upload New Portfolio</h2>
         <form action="/portfolio" method="POST" enctype="multipart/form-data">
             <input type="file" name="portfolio" accept="application/pdf" required>
@@ -27,6 +11,8 @@
         </form>
     </div>
     {{ end }}
-    <iframe src="/fs/{{ .Portfolio.FilePath }}#toolbar=0&navpanes=0&scrollbar=0" allowfullscreen></iframe>
+    <div class="iframe-container">
+        <iframe class="borderless-iframe" src="/fs/{{ .Portfolio.FilePath }}"></iframe>
+    </div>
 </body>
 </html>
