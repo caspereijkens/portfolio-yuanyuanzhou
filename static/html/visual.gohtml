@@ -3,7 +3,10 @@
     {{ template "navbar" .Login }}
 
     {{ if .Login }}
-        <form action="patch?type=visual" method="POST" enctype="multipart/form-data">
+    <form action="/visuals/{{ .Visual.ID }}" method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="_method" value="PATCH">
+            <input type="hidden" name="id" value="{{.Visual.ID}}">
+
             <div>
                 <label for="title">Title:</label>
                 <input type="text" id="title" name="title" value="{{ .Visual.Title }}" required>
@@ -23,8 +26,9 @@
                 <button type="submit">Save Changes</button>
             </div>
         </form>
-        <form action="/visual/{{ .Visual.ID }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this work?')">
+        <form action="/visuals/{{ .Visual.ID }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this work?')">
             <input type="hidden" name="_method" value="DELETE">
+            <input type="hidden" name="id" value="{{.Visual.ID}}">
             <button type="submit">Delete Visual</button>
         </form>
     {{ end }}
