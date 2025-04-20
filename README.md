@@ -1,4 +1,6 @@
 # portfolio-yuanyuanzhou
+Performant and secure multiplexer to serve an artist portfolio. 
+
 ## Workflow
 1. Make changes to code.
 2. Push code, merge master.

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+{{ template "head" "Info" }}
+    <body>
+    {{template "navbar" .Login }}
+    <h1>Info</h1>
+
+    <hr>
+    <div>{{.Info.Content}}</div>
+    {{ if .Login }}
+    <div>
+    <form action="/info" method="POST">
+        <h2>Edit Info</h2>
+        <div>
+            <label>Content:</label><br>
+            <textarea name="content" required>{{.Info.Content}}</textarea>
+        </div>
+
+        <div>
+            <button type="submit">Save Changes</button>
+        </div>
+    </form>
+    </div>
+    {{ end }}
+</body>
+</html>

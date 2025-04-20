@@ -1,0 +1,55 @@
+{{ template "head" .Visual.Title }}
+<body>
+    {{ template "navbar" .Login }}
+
+    {{ if .Login }}
+    <form action="/visuals/{{ .Visual.ID }}" method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="_method" value="PATCH">
+            <input type="hidden" name="id" value="{{.Visual.ID}}">
+
+            <div>
+                <label for="title">Title:</label>
+                <input type="text" id="title" name="title" value="{{ .Visual.Title }}" required>
+            </div>
+
+            <div>
+                <label for="description">Description:</label>
+                <textarea id="description" name="description" rows="5" required>{{ .Visual.Description }}</textarea>
+            </div>
+
+            <div>
+                <label>Add More Photos:</label>
+                <input type="file" name="photos" multiple accept="image/jpeg,image/png,image/webp">
+                <small>Max 10MB per file</small>
+            </div>
+            <div>
+                <button type="submit">Save Changes</button>
+            </div>
+        </form>
+        <form action="/visuals/{{ .Visual.ID }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this work?')">
+            <input type="hidden" name="_method" value="DELETE">
+            <input type="hidden" name="id" value="{{.Visual.ID}}">
+            <button type="submit">Delete Visual</button>
+        </form>
+    {{ end }}
+    <article>
+        <h1>{{ .Visual.Title }}</h1>
+        <time>{{ .Visual.CreatedAt.Format "2006-01-02" }}</time>
+
+        <div>{{ .Visual.Description }}</div>
+
+        <div>
+            {{ range .Visual.Photos }}
+            <img src="/fs/{{ . }}" alt="{{ . }}">
+            {{ end }}
+        </div>
+    </article>
+</body>
+<script>
+    function confirmDelete() {
+        if (confirm('Are you sure you want to delete this work?')) {
+            document.getElementById('method-field').value = 'DELETE';
+            document.querySelector('.work-form').submit();
+        }
+    }
+</script>

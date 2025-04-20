@@ -1,0 +1,64 @@
+<html>
+{{ template "head" "Yuanyuan Zhou Visual" }}
+<body>
+    {{template "navbar" .Login }}
+    {{if .Login}}
+        <div>
+            <h2>Add New Visual</h2>
+            <form action="/visuals" method="POST" enctype="multipart/form-data">
+                <div>
+                    <label for="title">Title:</label>
+                    <input type="text" id="title" name="title" placeholder="Enter work title" required>
+                </div>
+
+                <div>
+                    <label for="description">Description:</label>
+                    <textarea id="description" name="description" placeholder="Describe your work..."></textarea>
+                </div>
+                
+                <div>
+                    <label for="photos">Upload Photos (Max 10 MB total):</label>
+                    <input 
+                        type="file" 
+                        id="photos" 
+                        name="photos" 
+                        accept="image/*" 
+                        multiple 
+                        required
+                        onchange="previewFiles()"
+                    >
+                    <div id="preview" style="display: flex; gap: 10px; margin-top: 10px;"></div>
+                </div>
+                
+                <div>
+                    <button type="submit">Submit Visual</button>
+                </div>
+            </form>
+        </div>
+    {{end}}
+
+    <h1>Visuals</h1>
+    {{range .Visuals}}
+        <article>
+            <a href="/visuals/{{ .ID }}"><h2>{{ .CreatedAt.Format "2006-01-02" }} - {{.Title}}</h2></a>
+        </article>
+        <hr>
+    {{end}}
+
+    <script>
+        function previewFiles() {
+            const preview = document.getElementById('preview');
+            preview.innerHTML = '';
+            const files = document.querySelector('input[type=file]').files;
+            
+            Array.from(files).forEach(file => {
+                if (!file.type.startsWith('image/')) continue;
+                const img = document.createElement('img');
+                img.height = 60;
+                img.src = URL.createObjectURL(file);
+                preview.appendChild(img);
+            });
+        }
+    </script>
+</body>
+</html>
