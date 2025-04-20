@@ -27,7 +27,7 @@ RUN \
     go mod init webserver && \
     go mod tidy
 RUN \
-    GOOS=linux go build -ldflags="-s -w" -o ./bin/web-app ./main.go
+    GOOS=linux go build -ldflags="-s -w" -o ./bin/web-app ./
 
 # -----------------------------------------------------------------------------
 #  Main Stage
