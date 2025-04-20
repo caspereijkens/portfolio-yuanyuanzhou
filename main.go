@@ -96,10 +96,9 @@ type visualData struct {
 type FileUploadConfig struct {
 	AllowedTypes   map[string]bool
 	DestinationDir string
-	Filename       string 
+	Filename       string
 	MaxSize        int64
 }
-
 
 func main() {
 	port := determinePort()
@@ -141,4 +140,3 @@ func main() {
 	log.Printf("Server starting on %s...", port)
 	log.Fatal(srv.ListenAndServe())
 }
-

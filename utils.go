@@ -117,20 +117,20 @@ func storeFile(fileHeader *multipart.FileHeader, config FileUploadConfig) (strin
 	return strings.TrimPrefix(filePath, localFSDir), nil
 }
 func cleanupVisualFiles(visual Visual) error {
-		for _, path := range visual.Photos {		    
-			fullPath := filepath.Join(localFSDir, path)
-        
-        if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
-            return err
-        }
-        
-        dir := filepath.Dir(fullPath)	
-				if err := os.Remove(dir); err != nil && !os.IsNotExist(err)  {
-					return err
-				}
+	for _, path := range visual.Photos {
+		fullPath := filepath.Join(localFSDir, path)
+
+		if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
+			return err
 		}
 
-		return nil
+		dir := filepath.Dir(fullPath)
+		if err := os.Remove(dir); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func deleteSession(req *http.Request) *http.Cookie {
@@ -160,4 +160,3 @@ func getLoginStatus(req *http.Request) (*int, bool) {
 	}
 	return &userId, true
 }
-

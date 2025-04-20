@@ -12,7 +12,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
@@ -421,33 +420,33 @@ func handlePatchVisual(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleDeleteVisual(w http.ResponseWriter, r *http.Request) {
-    visualID, err := strconv.Atoi(r.FormValue("id"))
-    if err != nil {
-        http.Error(w, "Invalid visual ID", http.StatusBadRequest)
-        return
-    }
+	visualID, err := strconv.Atoi(r.FormValue("id"))
+	if err != nil {
+		http.Error(w, "Invalid visual ID", http.StatusBadRequest)
+		return
+	}
 
-    visual, err := getVisuals(visualID)
-    if err != nil {
-        http.Error(w, "Visual not found", http.StatusNotFound)
-        return
-    }
+	visual, err := getVisuals(visualID)
+	if err != nil {
+		http.Error(w, "Visual not found", http.StatusNotFound)
+		return
+	}
 
-    err = cleanupVisualFiles(visual[0])
-    if err != nil {
-        http.Error(w, "Failed to delete visual work", http.StatusInternalServerError)
-        log.Printf("Error deleting visual: %v", err)
-        return
-    }
+	err = cleanupVisualFiles(visual[0])
+	if err != nil {
+		http.Error(w, "Failed to delete visual work", http.StatusInternalServerError)
+		log.Printf("Error deleting visual: %v", err)
+		return
+	}
 
-    err = deleteVisual(visualID)
-    if err != nil {
-        http.Error(w, "Failed to delete visual work", http.StatusInternalServerError)
-        log.Printf("Error deleting visual: %v", err)
-        return
-    }
+	err = deleteVisual(visualID)
+	if err != nil {
+		http.Error(w, "Failed to delete visual work", http.StatusInternalServerError)
+		log.Printf("Error deleting visual: %v", err)
+		return
+	}
 
-    http.Redirect(w, r, "/visuals", http.StatusSeeOther)
+	http.Redirect(w, r, "/visuals", http.StatusSeeOther)
 }
 
 func listVisualsHandler(w http.ResponseWriter, r *http.Request) {
@@ -477,67 +476,67 @@ func handleListVisuals(w http.ResponseWriter, r *http.Request) {
 }
 
 func handlePostVisual(w http.ResponseWriter, r *http.Request) {
-    err := r.ParseMultipartForm(10 << 20) // 10 MB max
-    if err != nil {
-        log.Printf("Error parsing form: %v", err)
-        http.Error(w, "Unable to parse form data", http.StatusBadRequest)
-        return
-    }
+	err := r.ParseMultipartForm(10 << 20) // 10 MB max
+	if err != nil {
+		log.Printf("Error parsing form: %v", err)
+		http.Error(w, "Unable to parse form data", http.StatusBadRequest)
+		return
+	}
 
-    visual := Visual{
-        Title:       r.FormValue("title"),
-        Description: r.FormValue("description"),
-    }
+	visual := Visual{
+		Title:       r.FormValue("title"),
+		Description: r.FormValue("description"),
+	}
 
-    if visual.Title == "" {
-        http.Error(w, "Title is required", http.StatusBadRequest)
-        return
-    }
+	if visual.Title == "" {
+		http.Error(w, "Title is required", http.StatusBadRequest)
+		return
+	}
 
-    log.Printf("Creating visual - title: %s, description: %s", visual.Title, visual.Description)
-    
-    safeTitle := sanitizeFilename(visual.Title)
-    visualDir := filepath.Join(localFSDir, "visuals", safeTitle)
-    
-    if err := os.MkdirAll(visualDir, 0755); err != nil {
-        log.Printf("Error creating visual directory: %v", err)
-        http.Error(w, "Failed to create storage", http.StatusInternalServerError)
-        return
-    }
+	log.Printf("Creating visual - title: %s, description: %s", visual.Title, visual.Description)
 
-    var photoPaths []string
-    files := r.MultipartForm.File["photos"]
-    
-    for _, fileHeader := range files {
-        config := FileUploadConfig{
-            AllowedTypes: allowedImageMIMETypes,
-            DestinationDir: visualDir,
-            MaxSize:       2_000_000,
-        }
+	safeTitle := sanitizeFilename(visual.Title)
+	visualDir := filepath.Join(localFSDir, "visuals", safeTitle)
 
-        filePath, err := storeFile(fileHeader, config)
-        if err != nil {
-            log.Printf("Error uploading file: %v", err)
-            // Clean up any already uploaded files
-            os.RemoveAll(visualDir)
-            http.Error(w, "Error storing file", http.StatusInternalServerError)
-            return
-        }
-        photoPaths = append(photoPaths, filePath)
-    }
+	if err := os.MkdirAll(visualDir, 0755); err != nil {
+		log.Printf("Error creating visual directory: %v", err)
+		http.Error(w, "Failed to create storage", http.StatusInternalServerError)
+		return
+	}
 
-    visual.Photos = photoPaths
+	var photoPaths []string
+	files := r.MultipartForm.File["photos"]
 
-    id, err := insertVisual(visual)
-    if err != nil {
-        // Clean up files if DB insert fails
-        os.RemoveAll(visualDir)
-        http.Error(w, "Failed to save visual", http.StatusInternalServerError)
-        log.Printf("Error inserting visual: %v", err)
-        return
-    }
+	for _, fileHeader := range files {
+		config := FileUploadConfig{
+			AllowedTypes:   allowedImageMIMETypes,
+			DestinationDir: visualDir,
+			MaxSize:        2_000_000,
+		}
 
-		http.Redirect(w, r, fmt.Sprintf("/visuals/%d", id), http.StatusSeeOther)
+		filePath, err := storeFile(fileHeader, config)
+		if err != nil {
+			log.Printf("Error uploading file: %v", err)
+			// Clean up any already uploaded files
+			os.RemoveAll(visualDir)
+			http.Error(w, "Error storing file", http.StatusInternalServerError)
+			return
+		}
+		photoPaths = append(photoPaths, filePath)
+	}
+
+	visual.Photos = photoPaths
+
+	id, err := insertVisual(visual)
+	if err != nil {
+		// Clean up files if DB insert fails
+		os.RemoveAll(visualDir)
+		http.Error(w, "Failed to save visual", http.StatusInternalServerError)
+		log.Printf("Error inserting visual: %v", err)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/visuals/%d", id), http.StatusSeeOther)
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
