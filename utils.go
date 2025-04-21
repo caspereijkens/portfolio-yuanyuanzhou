@@ -26,6 +26,7 @@ func determinePort() string {
 	}
 	return ":" + port
 }
+
 func login(email string, password []byte) (*int, error) {
 	userId, registeredHashedPassword, err := getCredentials(email)
 	if err != nil {
@@ -37,6 +38,7 @@ func login(email string, password []byte) (*int, error) {
 	}
 	return userId, nil
 }
+
 func addSession(w http.ResponseWriter, email string, password []byte) error {
 	userId, err := login(email, password)
 	if err != nil {
@@ -52,6 +54,7 @@ func addSession(w http.ResponseWriter, email string, password []byte) error {
 	http.SetCookie(w, cookie)
 	return nil
 }
+
 func saveFile(src multipart.File, dstPath string) error {
 	dst, err := os.Create(dstPath)
 	if err != nil {
@@ -116,17 +119,19 @@ func storeFile(fileHeader *multipart.FileHeader, config FileUploadConfig) (strin
 
 	return strings.TrimPrefix(filePath, localFSDir), nil
 }
+
 func cleanupVisualFiles(visual Visual) error {
+	uniqueDirs := make(map[string]struct{})
+
 	for _, path := range visual.Photos {
-		fullPath := filepath.Join(localFSDir, path)
+		dir := filepath.Dir(filepath.Join(localFSDir, path))
+		uniqueDirs[dir] = struct{}{}
+	}
 
-		if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
-			return err
-		}
-
-		dir := filepath.Dir(fullPath)
-		if err := os.Remove(dir); err != nil && !os.IsNotExist(err) {
-			return err
+	for dir := range uniqueDirs {
+		err := os.RemoveAll(dir)
+		if err != nil && !os.IsNotExist(err) {
+			return err 
 		}
 	}
 
