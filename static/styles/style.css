@@ -53,17 +53,32 @@ article img {
     }
 }
 
-
-.iframe-container {
-    margin: 0 calc(50% - 50vw); /* Break out of body's max-width */
-    width: 100vw; /* Full viewport width */
-    height: 100vh; /* Full viewport height */
-    max-width: none !important; /* Override any constraints */
+.pdf-container {
+    width: 100%;
+    height: 100vh;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch; /* For smooth scrolling on iOS */
 }
 
-.borderless-iframe {
-    border: none;
+.pdf-iframe {
     width: 100%;
     height: 100%;
-    display: block;
+    border: none;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+    .pdf-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: auto;
+    }
+    
+    .pdf-iframe {
+        min-height: 100vh;
+    }
 }

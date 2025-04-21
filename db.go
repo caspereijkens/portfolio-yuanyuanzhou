@@ -49,7 +49,8 @@ func configDatabase() error {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title story NOT NULL,
         description story NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE INDEX IF NOT EXISTS idx_visuals_created_at ON visuals(created_at);

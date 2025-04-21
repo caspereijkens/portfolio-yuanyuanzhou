@@ -12,10 +12,9 @@
         const progressBar = uploadProgress.querySelector('progress');
         const progressText = document.getElementById('progressText');
 
-        // Maximum file size per image (2MB after compression)
-        const MAX_FILE_SIZE = 2 * 1024 * 1024; 
-        // Maximum total size for all images (10MB)
-        const MAX_TOTAL_SIZE = 10 * 1024 * 1024;
+        const MAX_FILE_SIZE = 0.8 * 1024 * 1024; 
+        const MAX_TOTAL_SIZE = 10 * 1024 * 1024;  
+        const PREVIEW_MAX_WIDTH = window.innerWidth > 768 ? 400 : Math.min(window.innerWidth - 40, 400); // Responsive preview size
 
         fileInput.addEventListener('change', async function(e) {
             errorMessage.textContent = '';
@@ -28,8 +27,8 @@
             const initialTotalSize = files.reduce((sum, file) => sum + file.size, 0);
             totalSize.textContent = `${(initialTotalSize / 1024 / 1024).toFixed(2)} MB`;
             
-            // Validate total size
-            if (initialTotalSize > MAX_TOTAL_SIZE * 3) { // Allow some buffer for HEIC conversion
+            // Validate total size with more conservative buffer
+            if (initialTotalSize > MAX_TOTAL_SIZE * 3) {
                 errorMessage.textContent = `Total size too large. Please select less than ${MAX_TOTAL_SIZE / 1024 / 1024} MB total.`;
                 return;
             }
@@ -38,7 +37,7 @@
             for (const file of files) {
                 try {
                     const processedFile = await processImageFile(file);
-                    previewFile(processedFile);
+                    previewFile(processedFile, PREVIEW_MAX_WIDTH);
                 } catch (error) {
                     console.error('Error processing file:', error);
                     errorMessage.textContent = `Error processing ${file.name}: ${error.message}`;
@@ -47,22 +46,23 @@
         });
 
         async function processImageFile(file) {
-            // Skip processing if file is already small enough
+            // Skip processing if file is already small enough and not HEIC
             if (file.size <= MAX_FILE_SIZE && !isHeicFile(file)) {
                 return file;
             }
 
-            // Convert HEIC to JPEG if needed
+            // Convert HEIC to JPEG if needed (with lower quality)
             if (isHeicFile(file)) {
                 file = await convertHeicToJpeg(file);
             }
 
-            // Compress the image
+            // Compress the image with more aggressive settings
             return await compressImage(file, {
-                maxWidth: 1920,
-                maxHeight: 1920,
-                quality: 0.7,
-                maxSizeMB: MAX_FILE_SIZE / 1024 / 1024
+                maxWidth: 1200, 
+                maxHeight: 1200, 
+                quality: 0.5, 
+                maxSizeMB: MAX_FILE_SIZE / 1024 / 1024,
+                useWebWorker: true 
             });
         }
 
@@ -80,7 +80,7 @@
             const result = await heic2any({
                 blob: file,
                 toType: 'image/jpeg',
-                quality: 0.7
+                quality: 0.5 
             });
             
             return new File([result], file.name.replace(/\.[^/.]+$/, '.jpg'), {
@@ -136,22 +136,31 @@
             });
         }
 
-        function previewFile(file) {
+        function previewFile(file, maxWidth) {
             const imgContainer = document.createElement('div');
             imgContainer.className = 'preview-item';
+            imgContainer.style.maxWidth = `${maxWidth}px`;
+            imgContainer.style.margin = '0 auto';
             
             const img = document.createElement('img');
             img.src = URL.createObjectURL(file);
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            img.style.display = 'block';
             
             const fileInfo = document.createElement('div');
             fileInfo.className = 'file-info';
-            fileInfo.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+            fileInfo.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`; // Changed to KB
+            fileInfo.style.fontSize = '0.8rem';
+            fileInfo.style.marginTop = '0.5rem';
+            fileInfo.style.textAlign = 'center';
             
             imgContainer.appendChild(img);
             imgContainer.appendChild(fileInfo);
             preview.appendChild(imgContainer);
         }
 
+        // Rest of your existing code for form submission...
         uploadForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
