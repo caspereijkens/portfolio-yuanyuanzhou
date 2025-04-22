@@ -1,4 +1,6 @@
 go.mod
 archive
 sqlite.DB
+data/serve/covers
+data/serve/portfolios
 go.sum
