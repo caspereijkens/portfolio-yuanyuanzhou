@@ -21,7 +21,9 @@ RUN apk add --no-cache \
 
 WORKDIR /workspace
 
-COPY . /workspace/
+COPY *.go /workspace/
+COPY ./static /workspace/static
+COPY ./data/serve/robots.txt /workspace/data/serve/robots.txt
 
 RUN \
     go mod init webserver && \
