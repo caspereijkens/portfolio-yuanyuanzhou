@@ -276,14 +276,7 @@ func handleGetPortfolio(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to fetch cover data", http.StatusInternalServerError)
 		return
 	}
-	portfolio := Portfolio{
-		FilePath: filePath,
-	}
-	_, loggedIn := getLoginStatus(r)
-	err = TPL.ExecuteTemplate(w, "portfolio.gohtml", portfolioData{Login: loggedIn, Portfolio: portfolio})
-	if err != nil {
-		http.Error(w, "Template error", http.StatusInternalServerError)
-	}
+	http.ServeFile(w, r, filepath.Join(localFSDir, filePath))
 }
 
 func handlePostPortfolio(w http.ResponseWriter, r *http.Request) {
@@ -323,6 +316,21 @@ func handlePostPortfolio(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/portfolio", http.StatusSeeOther)
+}
+
+func portfolioUploadHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+  handleUploadPortfolio(w, r)
+}
+
+func handleUploadPortfolio(w http.ResponseWriter, r *http.Request) {
+	_, loggedIn := getLoginStatus(r)
+	err = TPL.ExecuteTemplate(w, "portfolio.gohtml", loginData{Login: loggedIn})
+	if err != nil {
+		http.Error(w, "Template error", http.StatusInternalServerError)
+	}
 }
 
 func visualsHandler(w http.ResponseWriter, r *http.Request) {
@@ -593,6 +601,16 @@ func requireAuthUnlessGet(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+func requireAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		_, loggedIn := getLoginStatus(r)
+		if !loggedIn {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next(w, r)
+	}
+}
 func methodOverride(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
