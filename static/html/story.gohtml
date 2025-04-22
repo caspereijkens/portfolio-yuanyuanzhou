@@ -3,9 +3,9 @@
 {{ template "head" .Story.Title }}
     <body>
     {{template "navbar" .Login }}
-    <h1>{{.Story.Title}}</h1>
+    <h2>{{.Story.Title}}</h2>
 
-    <div class="timestamp">Created at: {{.Story.Timestamp.Format "Jan 2, 2006 at 15:04"}}</div>
+    <div class="timestamp">{{.Story.CreatedAt.Format "Jan 2, 2006 at 15:04"}}</div>
     <hr>
     <div>{{.Story.Content}}</div>
     {{ if .Login }}
