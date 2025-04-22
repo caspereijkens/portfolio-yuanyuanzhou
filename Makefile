@@ -1,6 +1,6 @@
 # Variables
 IMAGE_NAME = salmonsalmon/portfolio-yuanyuan
-VERSION ?= v0.0.6  # Default version if not provided
+VERSION ?= v0.0.7  # Default version if not provided
 IMAGE_TAG = $(IMAGE_NAME):$(VERSION)
 LATEST_TAG = $(IMAGE_NAME):latest
 PROXY_COMPOSE_FILE = nginx-proxy-compose.yaml
