@@ -139,28 +139,20 @@
         function previewFile(file, maxWidth) {
             const imgContainer = document.createElement('div');
             imgContainer.className = 'preview-item';
-            imgContainer.style.maxWidth = `${maxWidth}px`;
-            imgContainer.style.margin = '0 auto';
+            imgContainer.style.maxWidth = `${maxWidth}px`; // Keep this as inline style since it's dynamic
             
             const img = document.createElement('img');
             img.src = URL.createObjectURL(file);
-            img.style.maxWidth = '100%';
-            img.style.height = 'auto';
-            img.style.display = 'block';
-            
+            img.className = 'preview-image'; // Optional: if you want to add more specific styles later
             const fileInfo = document.createElement('div');
             fileInfo.className = 'file-info';
-            fileInfo.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`; // Changed to KB
-            fileInfo.style.fontSize = '0.8rem';
-            fileInfo.style.marginTop = '0.5rem';
-            fileInfo.style.textAlign = 'center';
+            fileInfo.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
             
             imgContainer.appendChild(img);
             imgContainer.appendChild(fileInfo);
             preview.appendChild(imgContainer);
         }
 
-        // Rest of your existing code for form submission...
         uploadForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             

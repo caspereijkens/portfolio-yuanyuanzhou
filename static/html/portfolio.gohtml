@@ -2,6 +2,7 @@
 <html lang="en">
 {{ template "head" "Yuanyuan Zhou Portfolio" }}
 <body>
+    {{ template "navbar" .Login }}
     {{ if .Login }}
     <div class="upload-section">
         <h2>Upload New Portfolio</h2>
@@ -11,8 +12,5 @@
         </form>
     </div>
     {{ end }}
-    <div class="pdf-container">
-        <iframe class="pdf-iframe" src="/fs/{{ .Portfolio.FilePath }}#toolbar=0&navpanes=0"></iframe>
-    </div>
 </body>
 </html>
