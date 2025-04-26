@@ -56,15 +56,17 @@
         <h1>{{ .Visual.Title }}</h1>
         <time>{{ .Visual.CreatedAt.Format "2006-01-02" }}</time>
         <div>{{ .Visual.Description }}</div>
-        <div>
-            {{ range .Visual.Photos }}
-            <img src="/fs/{{ . }}" alt="{{ . }}">
-            {{ end }}
+        <div id="photos-container">
+            <!-- Photos will be loaded here via JavaScript -->
         </div>
+        <button id="load-more-photos" style="display: none;">Load More Photos</button>
     </article>
+
+    {{ template "lazy-loading-script" . }}
 
     {{ if .Login }}
         {{ template "browser-image-compression-script" }}
     {{ end }}
+
 </body>
 </html>

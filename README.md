@@ -10,3 +10,4 @@ Performant and secure multiplexer to serve an artist portfolio.
 
 ## TODO
 - Improve this readme
+- Look at ordering.

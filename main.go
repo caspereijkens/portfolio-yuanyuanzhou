@@ -22,84 +22,6 @@ var allowedImageMIMETypes = map[string]bool{
 
 const localFSDir = "data/serve"
 
-type User struct {
-	Email          string
-	PasswordDigest []byte
-}
-
-type Cover struct {
-	FilePath string
-}
-
-type Portfolio struct {
-	FilePath string
-}
-
-type Story struct {
-	ID        int
-	Title     string
-	Content   string
-	CreatedAt time.Time
-}
-
-type Info struct {
-	Content string
-}
-
-type Visual struct {
-	ID          int       `db:"id"`
-	Title       string    `db:"title"`
-	Description string    `db:"description"`
-	CreatedAt   time.Time `db:"created_at"`
-	Photos      []string  // Populated separately
-}
-
-type loginData struct {
-	Login bool
-}
-
-type coverData struct {
-	Login bool
-	Cover Cover
-}
-
-type infoData struct {
-	Login bool
-	Info  Info
-}
-
-type portfolioData struct {
-	Login     bool
-	Portfolio Portfolio
-}
-
-type listStoryData struct {
-	Login   bool
-	Stories []Story
-}
-
-type listVisualData struct {
-	Login   bool
-	Visuals []Visual
-}
-
-type storyData struct {
-	Login bool
-	Story Story
-}
-
-type visualData struct {
-	Login  bool
-	Visual Visual
-}
-
-type FileUploadConfig struct {
-	AllowedTypes   map[string]bool
-	DestinationDir string
-	Filename       string
-	MaxSize        int64
-}
-
 func main() {
 	port := determinePort()
 
@@ -120,6 +42,8 @@ func main() {
 	mux.HandleFunc("/", requireAuthUnlessGet(indexHandler))
 	mux.HandleFunc("/stories/", methodOverride(requireAuthUnlessGet(storiesHandler)))
 	mux.HandleFunc("/stories", requireAuthUnlessGet(listStoriesHandler))
+	mux.HandleFunc("/photos/visual/", requireAuthUnlessGet(photosHandler))
+	mux.HandleFunc("/photos/", requireAuthUnlessGet(photosHandler))
 	mux.HandleFunc("/visuals/", methodOverride(requireAuthUnlessGet(visualsHandler)))
 	mux.HandleFunc("/visuals", requireAuthUnlessGet(listVisualsHandler))
 	mux.HandleFunc("/info", methodOverride(requireAuthUnlessGet(infoHandler)))

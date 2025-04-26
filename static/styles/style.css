@@ -1,13 +1,15 @@
 body {
     display: flex;
-    min-height: 100vh; /* Changed from height to min-height */
+    min-height: 100vh;
+    /* Changed from height to min-height */
     flex-direction: column;
     box-sizing: border-box;
     max-width: 1400px;
     margin: 0 auto;
     width: 100%;
     padding: 0 1rem;
-    overflow-x: hidden; /* Prevent horizontal scroll */
+    overflow-x: hidden;
+    /* Prevent horizontal scroll */
 }
 
 .upload-section {
@@ -18,10 +20,11 @@ body {
 
 article {
     max-width: 100%;
-    overflow: visible; /* Changed from hidden */
+    overflow: visible;
+    /* Changed from hidden */
 }
 
-article > div {
+article>div {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 1rem;
@@ -33,19 +36,20 @@ article img {
     height: auto;
     display: block;
     border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* Mobile responsiveness */
 @media (max-width: 768px) {
     body {
-        padding: 0 0.5rem; /* Slightly smaller padding on mobile */
+        padding: 0 0.5rem;
+        /* Slightly smaller padding on mobile */
     }
-    
-    article > div {
+
+    article>div {
         grid-template-columns: 1fr;
     }
-    
+
     /* Ensure touch targets are large enough */
     button {
         padding: 0.8rem 1.2rem;
@@ -66,4 +70,14 @@ article img {
     font-size: 0.8rem;
     margin-top: 0.5rem;
     text-align: center;
+}
+
+.loading-indicator {
+    text-align: center;
+    padding: 20px;
+    width: 100%;
+}
+
+.photo-item {
+    margin-bottom: 20px;
 }
