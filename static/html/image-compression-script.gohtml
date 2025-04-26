@@ -28,7 +28,7 @@
             totalSize.textContent = `${(initialTotalSize / 1024 / 1024).toFixed(2)} MB`;
             
             // Validate total size with more conservative buffer
-            if (initialTotalSize > MAX_TOTAL_SIZE * 3) {
+            if (initialTotalSize > MAX_TOTAL_SIZE * 4) {
                 errorMessage.textContent = `Total size too large. Please select less than ${MAX_TOTAL_SIZE / 1024 / 1024} MB total.`;
                 return;
             }

@@ -7,6 +7,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"unicode"
@@ -121,21 +122,47 @@ func storeFile(fileHeader *multipart.FileHeader, config FileUploadConfig) (strin
 }
 
 func cleanupVisualFiles(visual Visual) error {
-	uniqueDirs := make(map[string]struct{})
+    photos, _, err := getPhotosByVisualID(visual.ID, 0, 0)
+    if err != nil {
+        return fmt.Errorf("failed to get photos for visual %d: %w", visual.ID, err)
+    }
 
-	for _, path := range visual.Photos {
-		dir := filepath.Dir(filepath.Join(localFSDir, path))
-		uniqueDirs[dir] = struct{}{}
-	}
+    for _, photo := range photos {
+        fullPath := filepath.Join(localFSDir, photo.FilePath)
+        err := os.Remove(fullPath)
+        if err != nil && !os.IsNotExist(err) {
+            // Log the error but continue with other files
+            log.Printf("Warning: failed to delete photo file %s: %v", fullPath, err)
+        }
+    }
 
-	for dir := range uniqueDirs {
-		err := os.RemoveAll(dir)
-		if err != nil && !os.IsNotExist(err) {
-			return err 
-		}
-	}
+    safeTitle := sanitizeFilename(visual.Title)
+    visualDir := filepath.Join(localFSDir, "visuals", safeTitle)
+    
+    if isEmpty, err := isDirEmpty(visualDir); err == nil && isEmpty {
+        err = os.Remove(visualDir)
+        if err != nil && !os.IsNotExist(err) {
+            return fmt.Errorf("failed to remove visual directory %s: %w", visualDir, err)
+        }
+    } else if err != nil {
+        log.Printf("Warning: failed to check if directory %s is empty: %v", visualDir, err)
+    }
 
-	return nil
+    return nil
+}
+
+func isDirEmpty(dir string) (bool, error) {
+    f, err := os.Open(dir)
+    if err != nil {
+        return false, err
+    }
+    defer f.Close()
+
+    _, err = f.Readdirnames(1) // Try to read at least one entry
+    if err == io.EOF {
+        return true, nil
+    }
+    return false, err // Either not empty or error
 }
 
 func deleteSession(req *http.Request) *http.Cookie {
@@ -164,4 +191,24 @@ func getLoginStatus(req *http.Request) (*int, bool) {
 		return nil, false
 	}
 	return &userId, true
+}
+
+func getPaginationParams(r *http.Request) (int, int) {
+    // Default values
+    page := 1
+    perPage := 10
+
+    if p := r.URL.Query().Get("page"); p != "" {
+        if val, err := strconv.Atoi(p); err == nil && val > 0 {
+            page = val
+        }
+    }
+
+    if pp := r.URL.Query().Get("per_page"); pp != "" {
+        if val, err := strconv.Atoi(pp); err == nil && val > 0 && val <= 100 {
+            perPage = val
+        }
+    }
+
+    return page, perPage
 }

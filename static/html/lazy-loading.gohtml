@@ -1,0 +1,90 @@
+{{ define "lazy-loading-script" }}
+<script>
+    const visualID = {{ .Visual.ID }};
+    let currentPage = 1;
+    const photosPerPage = 4; // Default, can be changed
+    let totalPhotos = 0;
+    let totalPages = 1;
+    let isLoading = false;
+    
+    async function loadPhotos() {
+        if (isLoading || currentPage > totalPages) return;
+        
+        isLoading = true;
+        document.getElementById('load-more-photos').disabled = true;
+        document.getElementById('load-more-photos').textContent = 'Loading...';
+        
+        try {
+            const response = await fetch(`/photos/visual/${visualID}?page=${currentPage}&per_page=${photosPerPage}`);
+            if (!response.ok) throw new Error('Failed to load photos');
+            
+            const data = await response.json();
+            totalPhotos = data.pagination.total;
+            totalPages = data.pagination.total_pages;
+            
+            const container = document.getElementById('photos-container');
+            data.photos.forEach(photo => {
+                const photoDiv = document.createElement('div');
+                photoDiv.className = 'photo-item';
+                photoDiv.innerHTML = `
+                    <img src="/fs/${photo.file_path}" alt="Photo" loading="lazy">
+                    {{ if .Login }}
+                    <form class="delete-photo-form" onsubmit="return confirm('Delete this photo?')">
+                        <input type="hidden" name="_method" value="DELETE">
+                        <button type="submit" data-photo-id="${photo.id}">Delete</button>
+                    </form>
+                    {{ end }}
+                `;
+                container.appendChild(photoDiv);
+            });
+            
+            currentPage++;
+            
+            // Update load more button visibility
+            if (currentPage > totalPages) {
+                document.getElementById('load-more-photos').style.display = 'none';
+            } else {
+                document.getElementById('load-more-photos').style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Error loading photos:', error);
+            // Optionally show error to user
+        } finally {
+            isLoading = false;
+            document.getElementById('load-more-photos').disabled = false;
+            document.getElementById('load-more-photos').textContent = 'Load More Photos';
+        }
+    }
+    
+    // Initial load
+    document.addEventListener('DOMContentLoaded', loadPhotos);
+    
+    // Load more photos when button is clicked
+    document.getElementById('load-more-photos').addEventListener('click', loadPhotos);
+
+    // Handle photo deletion
+    document.addEventListener('submit', async function(e) {
+        if (e.target.classList.contains('delete-photo-form')) {
+            e.preventDefault();
+            const form = e.target;
+            const button = form.querySelector('button[type="submit"]');
+            const photoID = button.getAttribute('data-photo-id');
+            
+            try {
+                const response = await fetch(`/photos/${photoID}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    form.closest('.photo-item').remove();
+                } else {
+                    alert('Failed to delete photo');
+                }
+            } catch (error) {
+                console.error('Error deleting photo:', error);
+                alert('Error deleting photo');
+            }
+        }
+    });
+</script>
+{{ end }}
