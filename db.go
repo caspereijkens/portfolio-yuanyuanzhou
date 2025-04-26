@@ -287,32 +287,32 @@ func getLatestPortfolioPath() (string, error) {
 }
 
 func getVisuals(id ...int) ([]Visual, error) {
-    query := "SELECT id, title, description, created_at, updated_at FROM visuals"
-    var args []interface{}
-    
-    if len(id) > 0 {
-        query += " WHERE id = ?"
-        args = append(args, id[0])
-    }
-    query += " ORDER BY created_at DESC"
-    
-    rows, err := DB.Query(query, args...)
-    if err != nil {
-        return nil, fmt.Errorf("getVisuals: %w", err)
-    }
-    defer rows.Close()
-    
-    var visuals []Visual
-    for rows.Next() {
-        var v Visual
-        err := rows.Scan(&v.ID, &v.Title, &v.Description, &v.CreatedAt, &v.UpdatedAt)
-        if err != nil {
-            return nil, fmt.Errorf("getVisuals: %w", err)
-        }
-        visuals = append(visuals, v)
-    }
-    
-    return visuals, nil
+	query := "SELECT id, title, description, created_at, updated_at FROM visuals"
+	var args []interface{}
+
+	if len(id) > 0 {
+		query += " WHERE id = ?"
+		args = append(args, id[0])
+	}
+	query += " ORDER BY created_at DESC"
+
+	rows, err := DB.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("getVisuals: %w", err)
+	}
+	defer rows.Close()
+
+	var visuals []Visual
+	for rows.Next() {
+		var v Visual
+		err := rows.Scan(&v.ID, &v.Title, &v.Description, &v.CreatedAt, &v.UpdatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("getVisuals: %w", err)
+		}
+		visuals = append(visuals, v)
+	}
+
+	return visuals, nil
 }
 
 func updateVisual(visual Visual) error {
@@ -382,98 +382,98 @@ func insertVisual(visual Visual) (int, error) {
 }
 
 func getPhotosByVisualID(visualID, offset, limit int) ([]Photo, int, error) {
-    // First get total count
-    var totalCount int
-    err := DB.QueryRow("SELECT COUNT(*) FROM visual_photos WHERE visual_id = ?", visualID).Scan(&totalCount)
-    if err != nil {
-        return nil, 0, fmt.Errorf("getPhotosByVisualID count: %w", err)
-    }
+	// First get total count
+	var totalCount int
+	err := DB.QueryRow("SELECT COUNT(*) FROM visual_photos WHERE visual_id = ?", visualID).Scan(&totalCount)
+	if err != nil {
+		return nil, 0, fmt.Errorf("getPhotosByVisualID count: %w", err)
+	}
 
-    var rows *sql.Rows
-    var query string
-    var args []interface{}
+	var rows *sql.Rows
+	var query string
+	var args []interface{}
 
-    args = append(args, visualID)
-    
-    if limit > 0 {
-        // Paginated query
-        query = `
+	args = append(args, visualID)
+
+	if limit > 0 {
+		// Paginated query
+		query = `
             SELECT id, visual_id, file_path, created_at 
             FROM visual_photos 
             WHERE visual_id = ? 
             ORDER BY created_at, id
             LIMIT ? OFFSET ?
         `
-        args = append(args, limit, offset)
-    } else {
-        // Non-paginated query (get all photos)
-        query = `
+		args = append(args, limit, offset)
+	} else {
+		// Non-paginated query (get all photos)
+		query = `
             SELECT id, visual_id, file_path, created_at 
             FROM visual_photos 
             WHERE visual_id = ? 
             ORDER BY created_at, id
         `
-    }
+	}
 
-    rows, err = DB.Query(query, args...)
-    if err != nil {
-        return nil, 0, fmt.Errorf("getPhotosByVisualID query: %w", err)
-    }
-    defer rows.Close()
-    
-    var photos []Photo
-    for rows.Next() {
-        var p Photo
-        err := rows.Scan(&p.ID, &p.VisualID, &p.FilePath, &p.CreatedAt)
-        if err != nil {
-            return nil, 0, fmt.Errorf("getPhotosByVisualID scan: %w", err)
-        }
-        photos = append(photos, p)
-    }
-    
-    return photos, totalCount, nil
+	rows, err = DB.Query(query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("getPhotosByVisualID query: %w", err)
+	}
+	defer rows.Close()
+
+	var photos []Photo
+	for rows.Next() {
+		var p Photo
+		err := rows.Scan(&p.ID, &p.VisualID, &p.FilePath, &p.CreatedAt)
+		if err != nil {
+			return nil, 0, fmt.Errorf("getPhotosByVisualID scan: %w", err)
+		}
+		photos = append(photos, p)
+	}
+
+	return photos, totalCount, nil
 }
 
 func getPhotoByID(id int) (*Photo, error) {
-    query := "SELECT id, visual_id, file_path, created_at FROM visual_photos WHERE id = ?"
-    row := DB.QueryRow(query, id)
-    
-    var p Photo
-    err := row.Scan(&p.ID, &p.VisualID, &p.FilePath, &p.CreatedAt)
-    if err != nil {
-        return nil, fmt.Errorf("getPhotoByID: %w", err)
-    }
-    
-    return &p, nil
+	query := "SELECT id, visual_id, file_path, created_at FROM visual_photos WHERE id = ?"
+	row := DB.QueryRow(query, id)
+
+	var p Photo
+	err := row.Scan(&p.ID, &p.VisualID, &p.FilePath, &p.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("getPhotoByID: %w", err)
+	}
+
+	return &p, nil
 }
 
 func deletePhoto(id int) error {
-    _, err := DB.Exec("DELETE FROM visual_photos WHERE id = ?", id)
-    return err
+	_, err := DB.Exec("DELETE FROM visual_photos WHERE id = ?", id)
+	return err
 }
 
 func insertPhotos(visualID int, filePaths []string) error {
-    tx, err := DB.Begin()
-    if err != nil {
-        return fmt.Errorf("insertPhotos begin tx: %w", err)
-    }
-    
-    stmt, err := tx.Prepare("INSERT INTO visual_photos (visual_id, file_path) VALUES (?, ?)")
-    if err != nil {
-        tx.Rollback()
-        return fmt.Errorf("insertPhotos prepare: %w", err)
-    }
-    defer stmt.Close()
-    
-    for _, path := range filePaths {
-        _, err = stmt.Exec(visualID, path)
-        if err != nil {
-            tx.Rollback()
-            return fmt.Errorf("insertPhotos exec: %w", err)
-        }
-    }
-    
-    return tx.Commit()
+	tx, err := DB.Begin()
+	if err != nil {
+		return fmt.Errorf("insertPhotos begin tx: %w", err)
+	}
+
+	stmt, err := tx.Prepare("INSERT INTO visual_photos (visual_id, file_path) VALUES (?, ?)")
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("insertPhotos prepare: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, path := range filePaths {
+		_, err = stmt.Exec(visualID, path)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("insertPhotos exec: %w", err)
+		}
+	}
+
+	return tx.Commit()
 }
 
 func getCredentials(email string) (*int, []byte, error) {

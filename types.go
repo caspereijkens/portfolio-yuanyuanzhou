@@ -1,4 +1,4 @@
-package main 
+package main
 
 import (
 	"time"
@@ -37,15 +37,15 @@ type Visual struct {
 }
 
 type Photo struct {
-    ID        int       `json:"id"`
-    VisualID  int       `json:"visual_id"`
-    FilePath  string    `json:"file_path"`
-    CreatedAt time.Time `json:"created_at"`
+	ID        int       `json:"id"`
+	VisualID  int       `json:"visual_id"`
+	FilePath  string    `json:"file_path"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type PhotoResponse struct {
-    Photos     []Photo                `json:"photos"`
-    Pagination map[string]interface{} `json:"pagination"`
+	Photos     []Photo                `json:"photos"`
+	Pagination map[string]interface{} `json:"pagination"`
 }
 
 type loginData struct {

@@ -22,7 +22,6 @@ var allowedImageMIMETypes = map[string]bool{
 
 const localFSDir = "data/serve"
 
-
 func main() {
 	port := determinePort()
 
@@ -43,7 +42,7 @@ func main() {
 	mux.HandleFunc("/", requireAuthUnlessGet(indexHandler))
 	mux.HandleFunc("/stories/", methodOverride(requireAuthUnlessGet(storiesHandler)))
 	mux.HandleFunc("/stories", requireAuthUnlessGet(listStoriesHandler))
-	mux.HandleFunc("/photos/visual/", requireAuthUnlessGet(photosHandler)) 
+	mux.HandleFunc("/photos/visual/", requireAuthUnlessGet(photosHandler))
 	mux.HandleFunc("/photos/", requireAuthUnlessGet(photosHandler))
 	mux.HandleFunc("/visuals/", methodOverride(requireAuthUnlessGet(visualsHandler)))
 	mux.HandleFunc("/visuals", requireAuthUnlessGet(listVisualsHandler))
