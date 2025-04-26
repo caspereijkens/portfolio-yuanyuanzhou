@@ -67,3 +67,12 @@ article img {
     margin-top: 0.5rem;
     text-align: center;
 }
+
+.loading-indicator {
+    text-align: center;
+    padding: 20px;
+    width: 100%;
+}
+.photo-item {
+    margin-bottom: 20px;
+}

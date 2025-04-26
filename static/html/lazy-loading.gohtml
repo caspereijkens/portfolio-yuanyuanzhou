@@ -2,17 +2,17 @@
 <script>
     const visualID = {{ .Visual.ID }};
     let currentPage = 1;
-    const photosPerPage = 4; // Default, can be changed
+    const photosPerPage = 4;
     let totalPhotos = 0;
     let totalPages = 1;
     let isLoading = false;
-    
+    let initialLoadComplete = false;
+    let scrollListenerAttached = false;
+
     async function loadPhotos() {
         if (isLoading || currentPage > totalPages) return;
         
         isLoading = true;
-        document.getElementById('load-more-photos').disabled = true;
-        document.getElementById('load-more-photos').textContent = 'Loading...';
         
         try {
             const response = await fetch(`/photos/visual/${visualID}?page=${currentPage}&per_page=${photosPerPage}`);
@@ -23,6 +23,7 @@
             totalPages = data.pagination.total_pages;
             
             const container = document.getElementById('photos-container');
+            
             data.photos.forEach(photo => {
                 const photoDiv = document.createElement('div');
                 photoDiv.className = 'photo-item';
@@ -40,27 +41,65 @@
             
             currentPage++;
             
-            // Update load more button visibility
-            if (currentPage > totalPages) {
-                document.getElementById('load-more-photos').style.display = 'none';
-            } else {
-                document.getElementById('load-more-photos').style.display = 'block';
+            // Wait for next frame to check scrollability
+            if (!initialLoadComplete) {
+                requestAnimationFrame(checkViewportFill);
             }
+            
         } catch (error) {
             console.error('Error loading photos:', error);
-            // Optionally show error to user
         } finally {
             isLoading = false;
-            document.getElementById('load-more-photos').disabled = false;
-            document.getElementById('load-more-photos').textContent = 'Load More Photos';
         }
     }
-    
-    // Initial load
-    document.addEventListener('DOMContentLoaded', loadPhotos);
-    
-    // Load more photos when button is clicked
-    document.getElementById('load-more-photos').addEventListener('click', loadPhotos);
+
+    function checkViewportFill() {
+        const docHeight = document.documentElement.scrollHeight;
+        const winHeight = window.innerHeight;
+        const isScrollable = docHeight > winHeight + 100; // Small buffer
+
+        if (!isScrollable && currentPage <= totalPages) {
+            // Still not scrollable and more photos to load
+            loadPhotos();
+        } else {
+            if (!initialLoadComplete) {
+                initialLoadComplete = true;
+                setupScrollListener();
+            }
+        }
+    }
+
+    function setupScrollListener() {
+        if (scrollListenerAttached) return; // Avoid double attaching
+        scrollListenerAttached = true;
+
+        let ticking = false;
+
+        window.addEventListener('scroll', () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    checkScrollPosition();
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            if (initialLoadComplete) {
+                checkViewportFill();
+            }
+        });
+    }
+
+    function checkScrollPosition() {
+        const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+        const scrollThreshold = 300; // pixels from bottom
+
+        if (scrollHeight - (scrollTop + clientHeight) < scrollThreshold) {
+            loadPhotos();
+        }
+    }
 
     // Handle photo deletion
     document.addEventListener('submit', async function(e) {
@@ -77,6 +116,11 @@
                 
                 if (response.ok) {
                     form.closest('.photo-item').remove();
+
+                    // After deletion, check if page needs more photos
+                    if (initialLoadComplete) {
+                        requestAnimationFrame(checkViewportFill);
+                    }
                 } else {
                     alert('Failed to delete photo');
                 }
@@ -85,6 +129,11 @@
                 alert('Error deleting photo');
             }
         }
+    });
+
+    // Initial setup
+    document.addEventListener('DOMContentLoaded', () => {
+        loadPhotos();
     });
 </script>
 {{ end }}
