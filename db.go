@@ -47,8 +47,8 @@ func configDatabase() error {
 	createVisualTable := `
     CREATE TABLE IF NOT EXISTS visuals (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title story NOT NULL,
-        description story NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -65,7 +65,7 @@ func configDatabase() error {
     CREATE TABLE IF NOT EXISTS visual_photos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         visual_id INTEGER NOT NULL,
-        file_path story NOT NULL,
+        file_path TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (visual_id) REFERENCES visuals(id) ON DELETE CASCADE
     );
