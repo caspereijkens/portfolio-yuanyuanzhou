@@ -1,7 +1,7 @@
 services:
   go-web-app:
     restart: always
-    image: salmonsalmon/portfolio-yuanyuan:v0.0.9
+    image: salmonsalmon/portfolio-yuanyuan:v0.1.0
     build:
       dockerfile: Dockerfile
       context: .
