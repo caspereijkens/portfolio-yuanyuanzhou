@@ -592,7 +592,6 @@ func handleGetPhotos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get pagination parameters
 	page, perPage := getPaginationParams(r)
 	offset := (page - 1) * perPage
 

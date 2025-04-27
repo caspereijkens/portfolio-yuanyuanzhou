@@ -11,11 +11,14 @@
 
     async function loadPhotos() {
         if (isLoading || currentPage > totalPages) return;
-        
-        isLoading = true;
-        
+
         try {
-            const response = await fetch(`/photos/visual/${visualID}?page=${currentPage}&per_page=${photosPerPage}`);
+            isLoading = true;
+
+            // Load more photos at first
+            const effectivePhotosPerPage = initialLoadComplete ? photosPerPage : photosPerPage * 3;
+
+            const response = await fetch(`/photos/visual/${visualID}?page=${currentPage}&per_page=${effectivePhotosPerPage}`);
             if (!response.ok) throw new Error('Failed to load photos');
             
             const data = await response.json();
@@ -37,15 +40,18 @@
                     {{ end }}
                 `;
                 container.appendChild(photoDiv);
+            
+                requestAnimationFrame(() => {
+                    photoDiv.classList.add('visible');
+                });
             });
-            
+
             currentPage++;
-            
-            // Wait for next frame to check scrollability
+
+            // After DOM updates, check if we need to load more
             if (!initialLoadComplete) {
                 requestAnimationFrame(checkViewportFill);
             }
-            
         } catch (error) {
             console.error('Error loading photos:', error);
         } finally {
@@ -59,7 +65,6 @@
         const isScrollable = docHeight > winHeight + 100; // Small buffer
 
         if (!isScrollable && currentPage <= totalPages) {
-            // Still not scrollable and more photos to load
             loadPhotos();
         } else {
             if (!initialLoadComplete) {
@@ -70,7 +75,7 @@
     }
 
     function setupScrollListener() {
-        if (scrollListenerAttached) return; // Avoid double attaching
+        if (scrollListenerAttached) return;
         scrollListenerAttached = true;
 
         let ticking = false;
@@ -87,14 +92,14 @@
 
         window.addEventListener('resize', () => {
             if (initialLoadComplete) {
-                checkViewportFill();
+                requestAnimationFrame(checkViewportFill);
             }
         });
     }
 
     function checkScrollPosition() {
         const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
-        const scrollThreshold = 300; // pixels from bottom
+        const scrollThreshold = 600; // BOOST: increased from 300 to 600
 
         if (scrollHeight - (scrollTop + clientHeight) < scrollThreshold) {
             loadPhotos();
@@ -117,7 +122,7 @@
                 if (response.ok) {
                     form.closest('.photo-item').remove();
 
-                    // After deletion, check if page needs more photos
+                    // After deletion, recheck viewport
                     if (initialLoadComplete) {
                         requestAnimationFrame(checkViewportFill);
                     }

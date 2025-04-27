@@ -194,7 +194,6 @@ func getLoginStatus(req *http.Request) (*int, bool) {
 }
 
 func getPaginationParams(r *http.Request) (int, int) {
-	// Default values
 	page := 1
 	perPage := 10
 

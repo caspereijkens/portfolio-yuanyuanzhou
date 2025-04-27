@@ -382,50 +382,36 @@ func insertVisual(visual Visual) (int, error) {
 }
 
 func getPhotosByVisualID(visualID, offset, limit int) ([]Photo, int, error) {
-	// First get total count
+	// Get total count
 	var totalCount int
 	err := DB.QueryRow("SELECT COUNT(*) FROM visual_photos WHERE visual_id = ?", visualID).Scan(&totalCount)
 	if err != nil {
 		return nil, 0, fmt.Errorf("getPhotosByVisualID count: %w", err)
 	}
 
-	var rows *sql.Rows
-	var query string
-	var args []interface{}
-
-	args = append(args, visualID)
+	query := `
+        SELECT id, visual_id, file_path, created_at 
+        FROM visual_photos 
+        WHERE visual_id = ? 
+        ORDER BY created_at DESC, id DESC
+    `
+	args := []interface{}{visualID}
 
 	if limit > 0 {
-		// Paginated query
-		query = `
-            SELECT id, visual_id, file_path, created_at 
-            FROM visual_photos 
-            WHERE visual_id = ? 
-            ORDER BY created_at, id DESC
-            LIMIT ? OFFSET ?
-        `
+		query += " LIMIT ? OFFSET ?"
 		args = append(args, limit, offset)
-	} else {
-		// Non-paginated query (get all photos)
-		query = `
-            SELECT id, visual_id, file_path, created_at 
-            FROM visual_photos 
-            WHERE visual_id = ? 
-            ORDER BY created_at, id
-        `
 	}
 
-	rows, err = DB.Query(query, args...)
+	rows, err := DB.Query(query, args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("getPhotosByVisualID query: %w", err)
 	}
 	defer rows.Close()
 
-	var photos []Photo
+	photos := make([]Photo, 0, limit)
 	for rows.Next() {
 		var p Photo
-		err := rows.Scan(&p.ID, &p.VisualID, &p.FilePath, &p.CreatedAt)
-		if err != nil {
+		if err := rows.Scan(&p.ID, &p.VisualID, &p.FilePath, &p.CreatedAt); err != nil {
 			return nil, 0, fmt.Errorf("getPhotosByVisualID scan: %w", err)
 		}
 		photos = append(photos, p)
