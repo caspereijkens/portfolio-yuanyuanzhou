@@ -37,8 +37,8 @@ clean:
 # Deploy the application using docker-compose
 deploy:
 	@echo "Deploying the application with docker-compose"
-	docker-compose -f $(PROXY_COMPOSE_FILE) up -d --remove-orphans
-	docker-compose -f $(APP_COMPOSE_FILE) up -d --remove-orphans
+	docker-compose -f $(PROXY_COMPOSE_FILE) up -d 
+	docker-compose -f $(APP_COMPOSE_FILE) up -d 
 
 # Take down the application using docker-compose
 undeploy:
