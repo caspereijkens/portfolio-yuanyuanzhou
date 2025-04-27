@@ -401,7 +401,7 @@ func getPhotosByVisualID(visualID, offset, limit int) ([]Photo, int, error) {
             SELECT id, visual_id, file_path, created_at 
             FROM visual_photos 
             WHERE visual_id = ? 
-            ORDER BY created_at, id
+            ORDER BY created_at, id DESC
             LIMIT ? OFFSET ?
         `
 		args = append(args, limit, offset)
