@@ -13,145 +13,82 @@ import (
 var DB *sql.DB
 
 func configDatabase() error {
-	createUserTable := `
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email story NOT NULL UNIQUE,
-        password_digest BLOB NOT NULL
-    );
-    `
-	_, err := DB.Exec(createUserTable)
-	if err != nil {
-		log.Printf("configDatabase: %q: %s\n", err, createUserTable)
-		return err
+	createStatements := []string{
+		`CREATE TABLE IF NOT EXISTS users (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			email TEXT NOT NULL UNIQUE,
+			password_digest BLOB NOT NULL
+		);`,
+		`CREATE TABLE IF NOT EXISTS stories (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			title TEXT NOT NULL,
+			content TEXT NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(title)
+		);
+		CREATE INDEX IF NOT EXISTS idx_stories_created_at ON stories(created_at);`,
+		`CREATE TABLE IF NOT EXISTS visuals (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			title TEXT NOT NULL,
+			description TEXT NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);
+		CREATE INDEX IF NOT EXISTS idx_visuals_created_at ON visuals(created_at);`,
+		`CREATE TABLE IF NOT EXISTS visual_photos (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			visual_id INTEGER NOT NULL,
+			file_path TEXT NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (visual_id) REFERENCES visuals(id) ON DELETE CASCADE
+		);
+		CREATE INDEX IF NOT EXISTS idx_visual_photos_visual_id ON visual_photos(visual_id);`,
+		`CREATE TABLE IF NOT EXISTS info (
+			singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+			content TEXT NOT NULL,
+			last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);
+		INSERT OR IGNORE INTO info (singleton, content) VALUES (1, 'Welcome to my Website');`,
+		`CREATE TABLE IF NOT EXISTS covers (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			file_path TEXT NOT NULL UNIQUE,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);`,
+		`CREATE TABLE IF NOT EXISTS portfolios (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			file_path TEXT NOT NULL UNIQUE,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);`,
 	}
 
-	createStoryTable := `
-    CREATE TABLE IF NOT EXISTS stories (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        content TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(title)
-    );
-    
-    CREATE INDEX IF NOT EXISTS idx_stories_created_at ON stories(created_at);
-    `
-	_, err = DB.Exec(createStoryTable)
-	if err != nil {
-		log.Printf("configDatabase: %q: %s\n", err, createStoryTable)
-		return err
-	}
-
-	createVisualTable := `
-    CREATE TABLE IF NOT EXISTS visuals (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        description TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_visuals_created_at ON visuals(created_at);
-    `
-	_, err = DB.Exec(createVisualTable)
-	if err != nil {
-		log.Printf("configDatabase: %q: %s\n", err, createVisualTable)
-		return err
-	}
-
-	createVisualPhotosTable := `
-    CREATE TABLE IF NOT EXISTS visual_photos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        visual_id INTEGER NOT NULL,
-        file_path TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (visual_id) REFERENCES visuals(id) ON DELETE CASCADE
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_visual_photos_visual_id ON visual_photos(visual_id);
-    `
-	_, err = DB.Exec(createVisualPhotosTable)
-	if err != nil {
-		log.Printf("configDatabase: %q: %s\n", err, createVisualPhotosTable)
-		return err
-	}
-
-	createInfoTable := `
-	  CREATE TABLE IF NOT EXISTS info (
-        singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-        
-        content TEXT NOT NULL,
-        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-    
-    -- Initialize the single row
-    INSERT OR IGNORE INTO info (singleton, content) 
-    VALUES (1, 'Welcome to my Website');
-	`
-	_, err = DB.Exec(createInfoTable)
-	if err != nil {
-		log.Printf("configDatabase: %q: %s\n", err, createInfoTable)
-		return err
-	}
-
-	createCoversTable := `
-    CREATE TABLE IF NOT EXISTS covers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        file_path TEXT NOT NULL UNIQUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-    `
-	_, err = DB.Exec(createCoversTable)
-	if err != nil {
-		log.Printf("configDatabase: %q: %s\n", err, createCoversTable)
-		return err
-	}
-
-	var count int
-	err = DB.QueryRow("SELECT COUNT(*) FROM covers").Scan(&count)
-	if err != nil {
-		return fmt.Errorf("failed to check covers count: %w", err)
-	}
-
-	if count == 0 {
-		defaultPath := "covers/cover.png"
-		_, err = DB.Exec(
-			"INSERT INTO covers (file_path) VALUES (?)",
-			defaultPath,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to insert default cover: %w", err)
+	for _, stmt := range createStatements {
+		if _, err := DB.Exec(stmt); err != nil {
+			log.Printf("configDatabase: %q: %v\n", stmt, err)
+			return err
 		}
 	}
 
-	createPortfoliosTable := `
-    CREATE TABLE IF NOT EXISTS portfolios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        file_path TEXT NOT NULL UNIQUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-    `
-	_, err = DB.Exec(createPortfoliosTable)
-	if err != nil {
-		log.Printf("configDatabase: %q: %s\n", err, createPortfoliosTable)
-		return err
+	if err := ensureDefaultExists("covers", "file_path", "covers/cover.png"); err != nil {
+	    return err
+	}
+	if err := ensureDefaultExists("portfolios", "file_path", "portfolios/portfolio.pdf"); err != nil {
+	    return err
 	}
 
-	err = DB.QueryRow("SELECT COUNT(*) FROM portfolios").Scan(&count)
-	if err != nil {
-		return fmt.Errorf("failed to check covers count: %w", err)
-	}
+	return nil
+}
 
+func ensureDefaultExists(table, column, value string) error {
+	var count int
+	err := DB.QueryRow(fmt.Sprintf(`SELECT COUNT(*) FROM %s`, table)).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to check %s count: %w", table, err)
+	}
 	if count == 0 {
-		defaultPath := "portfolios/portfolio.pdf"
-		_, err = DB.Exec(
-			"INSERT INTO portfolios (file_path) VALUES (?)",
-			defaultPath,
-		)
+		_, err = DB.Exec(fmt.Sprintf(`INSERT INTO %s (%s) VALUES (?)`, table, column), value)
 		if err != nil {
-			return fmt.Errorf("failed to insert default portfolio: %w", err)
+			return fmt.Errorf("failed to insert into %s: %w", table, err)
 		}
 	}
 	return nil
@@ -196,7 +133,7 @@ func updateInfo(info Info) error {
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("updateStory (rows affected): %v", err)
+    return fmt.Errorf("updateInfo (rows affected): %v", err)
 	}
 	if rowsAffected == 0 {
 		return fmt.Errorf("no rows updated - either story doesn't exist or user doesn't have permission")
@@ -212,7 +149,7 @@ func getStories(id ...int) ([]Story, error) {
 	query = "SELECT id, title, content, created_at FROM stories"
 
 	if len(id) > 0 {
-		query += " WHERE id = $1"
+    query += " WHERE id = ?"
 		args = append(args, id[0])
 	}
 
@@ -330,23 +267,27 @@ func updateVisual(visual Visual) error {
 func deleteVisual(id int) error {
 	tx, err := DB.Begin()
 	if err != nil {
-		return err
+		return fmt.Errorf("deleteVisual (begin tx): %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		if p := recover(); p != nil {
+			tx.Rollback()
+			panic(p) // re-panic after rollback
+		} else if err != nil {
+			tx.Rollback()
+		}
+	}()
 
-	if _, err := tx.Exec(`DELETE FROM visual_photos WHERE visual_id = ?`, id); err != nil {
-		log.Printf("Failed to delete photos with visual id '%d': %v", id, err)
-		return err
+	if _, err = tx.Exec(`DELETE FROM visual_photos WHERE visual_id = ?`, id); err != nil {
+		return fmt.Errorf("deleteVisual (delete photos): %w", err)
 	}
 
-	if _, err := tx.Exec(`DELETE FROM visuals WHERE id = ?`, id); err != nil {
-		log.Printf("Failed to delete visual with id '%d': %v", id, err)
-		return err
+	if _, err = tx.Exec(`DELETE FROM visuals WHERE id = ?`, id); err != nil {
+		return fmt.Errorf("deleteVisual (delete visual): %w", err)
 	}
 
-	if err := tx.Commit(); err != nil {
-		log.Printf("Failed to delete visual with id '%d': %v", id, err)
-		return err
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("deleteVisual (commit tx): %w", err)
 	}
 
 	log.Printf("Successfully deleted visual with id '%d'", id)
@@ -354,17 +295,7 @@ func deleteVisual(id int) error {
 }
 
 func insertVisual(visual Visual) (int, error) {
-	// Begin transaction
-	tx, err := DB.Begin()
-	if err != nil {
-		return 0, fmt.Errorf("insertVisual (begin tx): %v", err)
-	}
-	defer tx.Rollback()
-
-	result, err := tx.Exec(
-		`INSERT INTO visuals (title, description) VALUES (?, ?)`,
-		visual.Title, visual.Description,
-	)
+	result, err := DB.Exec(`INSERT INTO visuals (title, description) VALUES (?, ?)`, visual.Title, visual.Description)
 	if err != nil {
 		return 0, fmt.Errorf("insertVisual (insert visual): %v", err)
 	}
@@ -373,11 +304,6 @@ func insertVisual(visual Visual) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("insertVisual (get ID): %v", err)
 	}
-
-	if err = tx.Commit(); err != nil {
-		return 0, fmt.Errorf("insertVisual (commit): %v", err)
-	}
-
 	return int(visualID), nil
 }
 
@@ -466,9 +392,8 @@ func getCredentials(email string) (*int, []byte, error) {
 	var userId int
 	var passwordDigest []byte
 	err := DB.QueryRow("SELECT id, password_digest FROM users WHERE email=?;", email).Scan(&userId, &passwordDigest)
-	if err != nil {
-		log.Printf("getCredentials: %v\n", err)
-		return nil, nil, err
+	if errors.Is(err, sql.ErrNoRows) {
+	    return nil, nil, fmt.Errorf("user not found")
 	}
 	if passwordDigest == nil {
 		log.Println("getCredentials: password digest not found")
