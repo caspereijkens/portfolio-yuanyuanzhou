@@ -47,14 +47,14 @@
         <form action="/visuals/{{ .Visual.ID }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this work?')">
             <input type="hidden" name="_method" value="DELETE">
             <input type="hidden" name="id" value="{{.Visual.ID}}">
-            <button type="submit">Delete Visual</button>
+            <button type="submit" style="color: red;">Delete Visual</button>
         </form>
     </div>
     {{ end }}
 
     <article>
         <h1>{{ .Visual.Title }}</h1>
-        <time>{{ .Visual.CreatedAt.Format "2006-01-02" }}</time>
+        <time>{{ .Visual.UpdatedAt.Format "Jan _2, 2006"}}</time>
         <div>{{ .Visual.Description }}</div>
         <div id="photos-container">
             <!-- Photos will be loaded here via JavaScript -->

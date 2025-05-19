@@ -7,6 +7,7 @@
 <a href="/">..</a>
 {{ range .Visuals -}}
 <a href="/visuals/{{ .ID }}">{{ .CreatedAt.Format "Jan _2 15:04"}} {{.Title}}</a>
+<div class="thumb-grid" data-id="{{ .ID }}"></div>
 {{ end -}}
 </pre>
     {{if .Login}}
@@ -53,6 +54,9 @@
     {{end}}
 
 <hr>
+
+{{ template "thumbnail-loading-script" }}
+
 {{ if .Login }}
     {{ template "browser-image-compression-script" }}
 {{ end }}

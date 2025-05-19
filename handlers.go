@@ -356,15 +356,21 @@ func handleGetVisual(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/visuals", http.StatusSeeOther)
 		return
 	}
-	visual, err := getVisuals(id)
+	visuals, err := getVisuals(id) 
 	if err != nil {
 		log.Printf("Error retrieving visual: %v", err)
 		http.Error(w, "Failed to retrieve visual work", http.StatusInternalServerError)
 		return
 	}
+	if len(visuals) == 0 {
+		log.Printf("Could not find visual with id '%d'", id)
+		http.NotFound(w, r) 
+		return
+	} 	
 
 	_, loggedIn := getLoginStatus(r)
-	err = TPL.ExecuteTemplate(w, "visual.gohtml", visualData{Login: loggedIn, Visual: visual[0]})
+
+	err = TPL.ExecuteTemplate(w, "visual.gohtml", visualData{Login: loggedIn, Visual: visuals[0]})
 	if err != nil {
 		http.Error(w, "Template error", http.StatusInternalServerError)
 	}
@@ -405,6 +411,8 @@ func handlePatchVisual(w http.ResponseWriter, r *http.Request) {
 			AllowedTypes:   allowedImageMIMETypes,
 			DestinationDir: visualDir,
 			MaxSize:        2_000_000,
+			ThumbnailMediumSize: 120,
+			ThumbnailSmallSize: 30,
 		}
 		for _, fileHeader := range files {
 			filePath, err := storeFile(fileHeader, config)
@@ -528,6 +536,8 @@ func handlePostVisual(w http.ResponseWriter, r *http.Request) {
 			AllowedTypes:   allowedImageMIMETypes,
 			DestinationDir: visualDir,
 			MaxSize:        2_000_000,
+			ThumbnailMediumSize: 120,
+			ThumbnailSmallSize: 30,
 		}
 
 		filePath, err := storeFile(fileHeader, config)
@@ -736,3 +746,44 @@ func methodOverride(next http.HandlerFunc) http.HandlerFunc {
 		next(w, r)
 	}
 }
+
+
+func thumbnailsHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		handleGetVisualThumbnails(w, r)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func handleGetVisualThumbnails(w http.ResponseWriter, r *http.Request) {
+	// Extract visual ID from URL path like "/thumbnails/visual/123"
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 4 || parts[2] != "visual" {
+		http.Error(w, "Invalid URL format", http.StatusBadRequest)
+		return
+	}
+
+	visualID, err := strconv.Atoi(parts[3])
+	if err != nil {
+		http.Error(w, "Invalid visual ID", http.StatusBadRequest)
+		return
+	}
+
+	photos, _, err := getPhotosByVisualID(visualID, 0, 0)
+	if err != nil {
+		http.Error(w, "Failed to load thumbnails", http.StatusInternalServerError)
+		return
+	}
+
+	thumbnails := []string{}
+	for _, photo := range photos {
+		smallThumb := "/fs" + thumbnailPath(photo.FilePath, "small")
+		thumbnails = append(thumbnails, smallThumb)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(thumbnails)
+}
+

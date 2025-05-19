@@ -1,0 +1,63 @@
+{{ define "thumbnail-loading-script"}}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll(".thumb-grid").forEach(async (div) => {
+        const visualId = div.dataset.id;
+        try {
+            const res = await fetch(`/thumbnails/visual/${visualId}`);
+            const thumbs = await res.json();
+
+            const fragment = document.createDocumentFragment(); // Create a document fragment
+
+            for (const src of thumbs) {
+                const container = document.createElement("div");
+                container.style.position = "relative";
+                container.style.width = "30px";
+                container.style.height = "30px";
+                container.style.margin = "2px";
+                container.style.display = "inline-block";
+
+                const smallImg = document.createElement("img");
+                smallImg.src = src;
+                smallImg.width = 30;
+                smallImg.height = 30;
+                smallImg.loading = "lazy";
+                smallImg.title = "Click to view";
+                smallImg.style.display = "block";
+
+                const mediumImg = document.createElement("img");
+                mediumImg.src = src.replace("/small/", "/medium/");
+                mediumImg.style.position = "absolute";
+                mediumImg.style.top = "-45px";
+                mediumImg.style.left = "-45px";
+                mediumImg.style.width = "120px";
+                mediumImg.style.height = "120px";
+                mediumImg.style.display = "none";
+                mediumImg.style.zIndex = "10";
+                mediumImg.style.border = "1px solid black"; /* Changed from boxShadow */
+                mediumImg.style.borderRadius = "4px";
+                mediumImg.style.loading = "lazy";
+                mediumImg.style.pointerEvents = "none";
+
+                container.addEventListener("mouseenter", () => {
+                    mediumImg.style.display = "block";
+                });
+                container.addEventListener("mouseleave", () => {
+                    mediumImg.style.display = "none";
+                });
+
+                container.onclick = () => window.location.href = `/visuals/${visualId}`;
+
+                container.appendChild(smallImg);
+                container.appendChild(mediumImg);
+                fragment.appendChild(container); // Append to the fragment
+            }
+            div.appendChild(fragment); // Append the entire fragment to the div
+        } catch (err) {
+            console.error("Failed to load thumbnails", err);
+            // Optionally display a fallback UI here
+        }
+    });
+});
+</script>
+{{ end }}

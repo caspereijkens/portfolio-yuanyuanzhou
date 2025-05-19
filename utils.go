@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"io"
+	"image"
+	"image/jpeg"
 	"log"
 	"mime/multipart"
 	"net/http"
@@ -18,6 +20,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	uuid "github.com/satori/go.uuid"
+	"github.com/disintegration/imaging"
 )
 
 func determinePort() string {
@@ -91,33 +94,41 @@ func storeFile(fileHeader *multipart.FileHeader, config FileUploadConfig) (strin
 	defer file.Close()
 
 	buffer := make([]byte, 512)
-	_, err = file.Read(buffer)
-	if err != nil {
+	if _, err = file.Read(buffer); err != nil {
 		return "", fmt.Errorf("error reading file for MIME type check: %v", err)
 	}
 	mimeType := http.DetectContentType(buffer)
 	if !config.AllowedTypes[mimeType] {
 		return "", fmt.Errorf("uploaded file type %s is not supported", mimeType)
 	}
-
 	if _, err = file.Seek(0, 0); err != nil {
 		return "", fmt.Errorf("error resetting file pointer: %v", err)
 	}
+
 	filename := config.Filename
 	if filename == "" {
 		ext := filepath.Ext(fileHeader.Filename)
 		filename = fmt.Sprintf("%s%s", uuid.NewV4().String(), ext)
 	}
+
 	if config.DestinationDir != "" {
 		if err := os.MkdirAll(config.DestinationDir, 0755); err != nil {
 			return "", fmt.Errorf("error creating destination directory: %v", err)
 		}
 	}
+
+	// Save original file
 	filePath := filepath.Join(config.DestinationDir, filename)
 	if err := saveFile(file, filePath); err != nil {
 		return "", fmt.Errorf("error saving file: %v", err)
 	}
 
+	// === Generate Thumbnail ===
+	if err := generateAndSaveThumbnail(filePath, config); err != nil {
+		log.Printf("Warning: thumbnail generation failed: %v", err)
+	}
+
+	// Return path relative to localFSDir
 	return strings.TrimPrefix(filePath, localFSDir), nil
 }
 
@@ -210,4 +221,53 @@ func getPaginationParams(r *http.Request) (int, int) {
 	}
 
 	return page, perPage
+}
+
+func generateAndSaveThumbnail(imagePath string, config FileUploadConfig) error {
+	img, err := imaging.Open(imagePath)
+	if err != nil {
+		return fmt.Errorf("error opening image for thumbnail: %v", err)
+	}
+
+	err = saveThumbnail(img, config.ThumbnailMediumSize, "medium", imagePath)
+	if err != nil {
+		return err
+	}
+
+	err = saveThumbnail(img, config.ThumbnailSmallSize, "small", imagePath)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func saveThumbnail(img image.Image, size int, sizeName string, originalImagePath string) error {
+	thumb := imaging.Thumbnail(img, size, size, imaging.Lanczos)
+	thumbDir := filepath.Join(filepath.Dir(originalImagePath), "thumbnails", sizeName)
+	if err := os.MkdirAll(thumbDir, 0755); err != nil {
+		return fmt.Errorf("error creating %s thumbnail directory: %v", sizeName, err)
+	}
+	thumbPath := filepath.Join(thumbDir, filepath.Base(originalImagePath))
+
+	// Save as JPEG with a quality setting
+	outFile, err := os.Create(thumbPath)
+	if err != nil {
+		return fmt.Errorf("error creating output file for %s thumbnail: %v", sizeName, err)
+	}
+	defer outFile.Close()
+
+	// Adjust quality as needed (0-100, higher is better quality but larger size)
+	err = jpeg.Encode(outFile, thumb, &jpeg.Options{Quality: 80})
+	if err != nil {
+		return fmt.Errorf("error saving %s thumbnail as JPEG: %v", sizeName, err)
+	}
+
+	return nil
+}
+
+func thumbnailPath(photoPath, size string) string {
+	dir := filepath.Dir(photoPath)
+	filename := filepath.Base(photoPath)
+	return filepath.Join(dir, "thumbnails", size, filename)
 }
