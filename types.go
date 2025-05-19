@@ -34,6 +34,7 @@ type Visual struct {
 	Description string    `db:"description"`
 	CreatedAt   time.Time `db:"created_at"`
 	UpdatedAt   time.Time `db:"updated_at"`
+	Photos      []Photo
 }
 
 type Photo struct {
@@ -88,8 +89,10 @@ type visualData struct {
 }
 
 type FileUploadConfig struct {
-	AllowedTypes   map[string]bool
-	DestinationDir string
-	Filename       string
-	MaxSize        int64
+    AllowedTypes        map[string]bool
+    DestinationDir      string
+    MaxSize             int64
+    Filename            string
+    ThumbnailMediumSize int 
+    ThumbnailSmallSize  int 
 }
