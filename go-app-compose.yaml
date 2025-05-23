@@ -1,5 +1,6 @@
 services:
   go-web-app:
+    pull_policy: always
     restart: always
     image: salmonsalmon/portfolio-yuanyuan:v0.1.4
     build:
