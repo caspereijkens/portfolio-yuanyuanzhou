@@ -2,3 +2,4 @@ archive
 sqlite.DB
 tmp
 data/*
+bin

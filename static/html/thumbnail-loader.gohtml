@@ -6,7 +6,6 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const res = await fetch(`/thumbnails/visual/${visualId}`);
             const thumbs = await res.json();
-
             const fragment = document.createDocumentFragment(); // Create a document fragment
 
             for (const src of thumbs) {
@@ -19,12 +18,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 const smallImg = document.createElement("img");
                 smallImg.src = src;
-                smallImg.width = 30;
-                smallImg.height = 30;
+
                 smallImg.loading = "lazy";
                 smallImg.title = "Click to view";
                 smallImg.style.display = "block";
 
+                smallImg.style.width = "100%";
+                smallImg.style.height = "100%";
+                smallImg.style.objectFit = "cover";
+                smallImg.style.borderRadius = "2px";
                 const mediumImg = document.createElement("img");
                 mediumImg.src = src.replace("/small/", "/medium/");
                 mediumImg.style.position = "absolute";
@@ -32,9 +34,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 mediumImg.style.left = "-45px";
                 mediumImg.style.width = "120px";
                 mediumImg.style.height = "120px";
+                mediumImg.style.objectFit = "cover";
                 mediumImg.style.display = "none";
                 mediumImg.style.zIndex = "10";
-                mediumImg.style.border = "1px solid black"; /* Changed from boxShadow */
+                mediumImg.style.border = "1px solid black";
                 mediumImg.style.borderRadius = "4px";
                 mediumImg.style.loading = "lazy";
                 mediumImg.style.pointerEvents = "none";
