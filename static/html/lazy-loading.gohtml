@@ -28,7 +28,7 @@
                 const photoDiv = document.createElement('div');
                 photoDiv.className = 'photo-item';
                 photoDiv.innerHTML = `
-                    <img src="/fs/${photo.file_path}" alt="Photo" loading="lazy">
+                    <img src="/fs${photo.file_path}" alt="Photo" loading="lazy">
                     {{ if .Login }}
                     <form class="delete-photo-form" onsubmit="return confirm('Delete this photo?')">
                         <input type="hidden" name="_method" value="DELETE">
