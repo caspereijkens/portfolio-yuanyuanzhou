@@ -128,9 +128,9 @@ document.addEventListener('DOMContentLoaded', () => {
     /**
      * Creates a DOM element for a single file preview.
      * @param {File} file The file to create a preview for.
-     * @returns {object} An object containing the preview element and its URL.
-     * @property {HTMLElement} container The created container div for the preview.
-     * @property {string} objectUrl The blob URL created for the image source.
+     * @returns {object} An object with the container and URL.
+     * @property {HTMLElement} container The preview element.
+     * @property {string} objectUrl The blob URL for the preview image.
      */
     const createPreviewElement = (file) => {
         const objectUrl = URL.createObjectURL(file);
@@ -169,7 +169,13 @@ document.addEventListener('DOMContentLoaded', () => {
         uploadProgress.style.display = 'block';
         
         try {
-            const formData = new FormData();
+            // FIX: Initialize FormData from the form to include all hidden fields.
+            const formData = new FormData(uploadForm);
+
+            // FIX: Remove the original, unprocessed files from the form data.
+            formData.delete('photos'); 
+
+            // FIX: Append the new, processed files.
             processedFilesCache.forEach(file => {
                 formData.append('photos', file, file.name);
             });
@@ -194,7 +200,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (xhr.status >= 200 && xhr.status < 300) {
                     window.location.reload();
                 } else {
-                    errorMessage.textContent = `Upload failed: ${xhr.statusText}`;
+                    // Try to get a more specific error message from the server response
+                    errorMessage.textContent = `Upload failed: ${xhr.statusText || 'Bad Request'}`;
                 }
             };
             

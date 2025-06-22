@@ -1,198 +1,141 @@
 {{ define "lazy-loading-script" }}
 <script>
-document.addEventListener('DOMContentLoaded', () => {
+    const visualID = {{ .Visual.ID }};
+    let currentPage = 1;
+    const photosPerPage = 4;
+    let totalPhotos = 0;
+    let totalPages = 1;
+    let isLoading = false;
+    let initialLoad = true;
+    let scrollListenerAttached = false;
 
-    /**
-     * Manages the lazy loading, display, and deletion of photos using IntersectionObserver.
-     */
-    class PhotoLazyLoader {
-        /**
-         * @param {number} visualID The ID of the visual content to load photos for.
-         */
-        constructor(visualID) {
-            // --- Configuration & State ---
-            this.visualID = visualID;
-            this.currentPage = 1;
-            this.totalPages = 1;
-            this.isLoading = false;
-            this.photosPerPage = 12; // Fetch more initially to fill the viewport
+    async function loadPhotos() {
+        if (isLoading || currentPage > totalPages) return;
 
-            // --- DOM Element References ---
-            this.container = document.getElementById('photos-container');
-            this.statusContainer = document.getElementById('loader-status');
-            this.sentinel = document.getElementById('loader-sentinel'); // The element to observe
+        try {
+            isLoading = true;
 
-            if (!this.container || !this.sentinel || !this.statusContainer) {
-                console.error('Required DOM elements for lazy loading are missing.');
-                return;
-            }
-            
-            this.isUserLoggedIn = {{ .Login }};
+            const response = await fetch(`/photos/visual/${visualID}?page=${currentPage}&per_page=${photosPerPage}`);
+            if (!response.ok) throw new Error('Failed to load photos');
 
-            // --- Initialization ---
-            this.initObserver();
-            this.initEventListeners();
-        }
+            const data = await response.json();
+            totalPhotos = data.pagination.total;
+            totalPages = data.pagination.total_pages;
 
-        /**
-         * Sets up the IntersectionObserver to watch the sentinel element.
-         */
-        initObserver() {
-            const options = {
-                rootMargin: '400px 0px', // Load content when it's 400px away from the viewport
-            };
+            const container = document.getElementById('photos-container');
 
-            const callback = (entries) => {
-                entries.forEach(entry => {
-                    // Load more photos if the sentinel is visible and there are more pages
-                    if (entry.isIntersecting && !this.isLoading && this.currentPage <= this.totalPages) {
-                        this.loadPhotos();
-                    }
+            data.photos.forEach(photo => {
+                const photoDiv = document.createElement('div');
+                photoDiv.className = 'photo-item';
+                photoDiv.innerHTML = `
+                    <img src="/fs${photo.file_path}" alt="Photo" loading="lazy">
+                    {{ if .Login }}
+                    <form class="delete-photo-form" onsubmit="return confirm('Delete this photo?')">
+                        <input type="hidden" name="_method" value="DELETE">
+                        <button type="submit" data-photo-id="${photo.id}">Delete</button>
+                    </form>
+                    {{ end }}
+                `;
+                container.appendChild(photoDiv);
+
+                requestAnimationFrame(() => {
+                    photoDiv.classList.add('visible');
                 });
-            };
-
-            const observer = new IntersectionObserver(callback, options);
-            observer.observe(this.sentinel);
-        }
-
-        /**
-         * Sets up event listeners for dynamic content (e.g., photo deletion).
-         */
-        initEventListeners() {
-            this.container.addEventListener('submit', async (e) => {
-                if (e.target.matches('.delete-photo-form')) {
-                    e.preventDefault();
-                    if (confirm('Are you sure you want to delete this photo?')) {
-                        this.handleDelete(e.target);
-                    }
-                }
-            });
-        }
-
-        /**
-         * Fetches photo data from the API and renders them.
-         */
-        async loadPhotos() {
-            if (this.isLoading || this.currentPage > this.totalPages) return;
-
-            this.isLoading = true;
-            this.updateStatus('Loading more photos...');
-
-            try {
-                const url = `/photos/visual/${this.visualID}?page=${this.currentPage}&per_page=${this.photosPerPage}`;
-                const response = await fetch(url);
-
-                if (!response.ok) {
-                    throw new Error(`Failed to load photos (status: ${response.status})`);
-                }
-
-                const data = await response.json();
-                this.totalPages = data.pagination.total_pages;
-                
-                this.renderPhotos(data.photos);
-                this.currentPage++;
-                
-                // After the first page, subsequent requests can be smaller
-                this.photosPerPage = 4;
-
-                if (this.currentPage > this.totalPages) {
-                    this.updateStatus('You have reached the end.');
-                    this.sentinel.style.display = 'none'; // Hide the sentinel
-                } else {
-                   this.updateStatus(''); // Clear status on success
-                }
-
-            } catch (error) {
-                console.error('Error loading photos:', error);
-                this.updateStatus(error.message, true);
-            } finally {
-                this.isLoading = false;
-            }
-        }
-
-        /**
-         * Renders an array of photo objects to the container.
-         * @param {Array<Object>} photos The array of photo objects from the API.
-         */
-        renderPhotos(photos) {
-            if (photos.length === 0 && this.currentPage === 1) {
-                this.updateStatus('No photos found.');
-                return;
-            }
-
-            const fragment = document.createDocumentFragment();
-            photos.forEach(photo => {
-                const photoElement = this.createPhotoElement(photo);
-                fragment.appendChild(photoElement);
             });
 
-            this.container.appendChild(fragment);
-        }
+            currentPage++;
 
-        /**
-         * Creates a single photo element from a photo object.
-         * @param {Object} photo A photo object from the API.
-         * @returns {HTMLElement} The created DOM element for the photo.
-         */
-        createPhotoElement(photo) {
-            const photoDiv = document.createElement('div');
-            photoDiv.className = 'photo-item';
-
-            // Use template literals for clean HTML structure
-            photoDiv.innerHTML = `
-                <img src="/fs${photo.file_path}" alt="Photo of ${this.visualID}" loading="lazy" class="photo-img">
-                ${this.isUserLoggedIn ? `
-                <form class="delete-photo-form">
-                    <button type="submit" class="delete-btn" data-photo-id="${photo.id}" title="Delete photo">×</button>
-                </form>
-                ` : ''}
-            `;
-            
-            // Add fade-in animation
-            requestAnimationFrame(() => {
-                photoDiv.classList.add('visible');
-            });
-            
-            return photoDiv;
-        }
-
-        /**
-         * Handles the deletion of a photo.
-         * @param {HTMLFormElement} form The form that was submitted.
-         */
-        async handleDelete(form) {
-            const button = form.querySelector('button[data-photo-id]');
-            const photoID = button.dataset.photoId;
-            
-            try {
-                const response = await fetch(`/photos/${photoID}`, { method: 'DELETE' });
-                if (response.ok) {
-                    const photoItem = form.closest('.photo-item');
-                    photoItem?.remove();
-                } else {
-                    const errorData = await response.json();
-                    this.updateStatus(`Failed to delete photo: ${errorData.error || 'Server error'}`, true);
-                }
-            } catch (error) {
-                console.error('Error deleting photo:', error);
-                this.updateStatus('A network error occurred while deleting the photo.', true);
-            }
-        }
-
-        /**
-         * Updates the status message displayed to the user.
-         * @param {string} message The message to display.
-         * @param {boolean} [isError=false] Whether the message is an error.
-         */
-        updateStatus(message, isError = false) {
-            this.statusContainer.textContent = message;
-            this.statusContainer.className = isError ? 'status-error' : 'status-info';
+        } catch (error) {
+            console.error('Error loading photos:', error);
+        } finally {
+            isLoading = false;
         }
     }
 
-    // --- Start the lazy loader ---
-    const visualID = {{ .Visual.ID }};
-    new PhotoLazyLoader(visualID);
-});
+    async function loadInitialPhotos() {
+        // Load 3 pages initially
+        for (let i = 0; i < 3; i++) {
+            await loadPhotos();
+        }
+        initialLoad = false;
+        setupScrollListener();
+        requestAnimationFrame(checkViewportFill);
+    }
+
+    function checkViewportFill() {
+        const docHeight = document.documentElement.scrollHeight;
+        const winHeight = window.innerHeight;
+        const isScrollable = docHeight > winHeight + 100; // Small buffer
+
+        if (!isScrollable && currentPage <= totalPages) {
+            loadPhotos();
+        }
+    }
+
+    function setupScrollListener() {
+        if (scrollListenerAttached) return;
+        scrollListenerAttached = true;
+
+        let ticking = false;
+
+        window.addEventListener('scroll', () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    checkScrollPosition();
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            if (!isLoading) {
+                requestAnimationFrame(checkViewportFill);
+            }
+        });
+    }
+
+    function checkScrollPosition() {
+        const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+        const scrollThreshold = 600; // Buffer
+
+        if (scrollHeight - (scrollTop + clientHeight) < scrollThreshold) {
+            loadPhotos();
+        }
+    }
+
+    // Handle photo deletion
+    document.addEventListener('submit', async function(e) {
+        if (e.target.classList.contains('delete-photo-form')) {
+            e.preventDefault();
+            const form = e.target;
+            const button = form.querySelector('button[type="submit"]');
+            const photoID = button.getAttribute('data-photo-id');
+
+            try {
+                const response = await fetch(`/photos/${photoID}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    const photoItem = form.closest('.photo-item');
+                    photoItem?.remove();
+
+                    // After deletion, check if we need to load more to fill
+                    requestAnimationFrame(checkViewportFill);
+                } else {
+                    alert('Failed to delete photo');
+                }
+            } catch (error) {
+                console.error('Error deleting photo:', error);
+                alert('Error deleting photo');
+            }
+        }
+    });
+
+    // Initial setup
+    document.addEventListener('DOMContentLoaded', () => {
+        loadInitialPhotos();
+    });
 </script>
 {{ end }}
