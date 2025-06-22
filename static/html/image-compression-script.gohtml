@@ -30,7 +30,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetUI = () => {
         errorMessage.textContent = '';
         preview.innerHTML = '';
-        // Revoke any existing object URLs to prevent memory leaks
         previewObjectUrls.forEach(url => URL.revokeObjectURL(url));
         previewObjectUrls = [];
         processedFilesCache = [];
@@ -56,7 +55,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const initialTotalSize = files.reduce((sum, file) => sum + file.size, 0);
         totalSize.textContent = `Initial size: ${(initialTotalSize / 1024 / 1024).toFixed(2)} MB`;
 
-        // A pre-emptive check to avoid processing extremely large batches.
         if (initialTotalSize > MAX_TOTAL_SIZE * 5) {
             errorMessage.textContent = `Total file size is too large. Please select under ${MAX_TOTAL_SIZE_MB * 5} MB.`;
             return;
@@ -66,7 +64,6 @@ document.addEventListener('DOMContentLoaded', () => {
         submitBtn.disabled = true;
 
         try {
-            // Process all files in parallel for performance.
             const processingPromises = files.map(file => processImageFile(file));
             processedFilesCache = await Promise.all(processingPromises);
 
@@ -102,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (processedFile.size <= MAX_FILE_SIZE) {
-            return processedFile; // No need to compress if already small enough
+            return processedFile;
         }
         
         return compressImage(processedFile, {
@@ -121,7 +118,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const updatePreviews = (files) => {
         const fragment = document.createDocumentFragment();
         for (const file of files) {
-            // FIX: Avoid JS destructuring syntax that confuses Go templates.
             const previewData = createPreviewElement(file);
             fragment.appendChild(previewData.container);
             previewObjectUrls.push(previewData.objectUrl);
@@ -132,7 +128,9 @@ document.addEventListener('DOMContentLoaded', () => {
     /**
      * Creates a DOM element for a single file preview.
      * @param {File} file The file to create a preview for.
-     * @returns {{container: HTMLElement, objectUrl: string}} The container element and the created object URL.
+     * @returns {object} An object containing the preview element and its URL.
+     * @property {HTMLElement} container The created container div for the preview.
+     * @property {string} objectUrl The blob URL created for the image source.
      */
     const createPreviewElement = (file) => {
         const objectUrl = URL.createObjectURL(file);
@@ -152,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         container.append(img, fileInfo);
         
-        return { container, objectUrl };
+        return { container: container, objectUrl: objectUrl };
     };
 
     /**
@@ -244,7 +242,9 @@ document.addEventListener('DOMContentLoaded', () => {
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-                let { width, height } = img;
+                
+                let width = img.width;
+                let height = img.height;
                 
                 if (width > height) {
                     if (width > options.maxWidth) {
