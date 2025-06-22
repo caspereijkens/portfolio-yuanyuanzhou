@@ -55,7 +55,7 @@ undeploy-app:
 	@echo "Taking down the application with docker-compose"
 	docker-compose -f $(APP_COMPOSE_FILE) down
 
-reset-app: undeploy-app clean
+reset-app: undeploy-app clean deploy-app
 
 exec:
 	@docker exec -it $$(docker ps -q -f "ancestor=$(IMAGE_TAG)") sh
