@@ -1,220 +1,281 @@
 {{ define "browser-image-compression-script" }}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const fileInput = document.getElementById('photos');
-        const preview = document.getElementById('preview');
-        const fileCount = document.getElementById('fileCount');
-        const totalSize = document.getElementById('totalSize');
-        const uploadForm = document.getElementById('uploadForm');
-        const submitBtn = document.getElementById('submitBtn');
-        const errorMessage = document.getElementById('errorMessage');
-        const uploadProgress = document.getElementById('uploadProgress');
-        const progressBar = uploadProgress.querySelector('progress');
-        const progressText = document.getElementById('progressText');
+document.addEventListener('DOMContentLoaded', () => {
+    // --- DOM Element References ---
+    const fileInput = document.getElementById('photos');
+    const preview = document.getElementById('preview');
+    const fileCount = document.getElementById('fileCount');
+    const totalSize = document.getElementById('totalSize');
+    const uploadForm = document.getElementById('uploadForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const errorMessage = document.getElementById('errorMessage');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const progressBar = uploadProgress.querySelector('progress');
+    const progressText = document.getElementById('progressText');
 
-        const MAX_FILE_SIZE = 0.8 * 1024 * 1024; 
-        const MAX_TOTAL_SIZE = 10 * 1024 * 1024;  
-        const PREVIEW_MAX_WIDTH = window.innerWidth > 768 ? 400 : Math.min(window.innerWidth - 40, 400); // Responsive preview size
+    // --- Configuration Constants ---
+    const MAX_FILE_SIZE_MB = 0.8;
+    const MAX_TOTAL_SIZE_MB = 10;
+    const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024;
+    const MAX_TOTAL_SIZE = MAX_TOTAL_SIZE_MB * 1024 * 1024;
+    const PREVIEW_MAX_WIDTH = window.innerWidth > 768 ? 400 : Math.min(window.innerWidth - 40, 400);
 
-        fileInput.addEventListener('change', async function(e) {
-            errorMessage.textContent = '';
-            preview.innerHTML = '';
+    // --- State Variables ---
+    let processedFilesCache = [];
+    let previewObjectUrls = [];
+
+    /**
+     * Resets the UI and state variables to their initial state.
+     */
+    const resetUI = () => {
+        errorMessage.textContent = '';
+        preview.innerHTML = '';
+        // Revoke any existing object URLs to prevent memory leaks
+        previewObjectUrls.forEach(url => URL.revokeObjectURL(url));
+        previewObjectUrls = [];
+        processedFilesCache = [];
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Upload';
+        fileCount.textContent = 'No files selected';
+        totalSize.textContent = '0 MB';
+    };
+
+    /**
+     * Handles the file selection event.
+     * @param {Event} e The change event from the file input.
+     */
+    const handleFileSelection = async (e) => {
+        resetUI();
+        const files = Array.from(e.target.files);
+
+        if (files.length === 0) {
+            return;
+        }
+
+        fileCount.textContent = `${files.length} file${files.length !== 1 ? 's' : ''} selected`;
+        const initialTotalSize = files.reduce((sum, file) => sum + file.size, 0);
+        totalSize.textContent = `Initial size: ${(initialTotalSize / 1024 / 1024).toFixed(2)} MB`;
+
+        // A pre-emptive check to avoid processing extremely large batches.
+        if (initialTotalSize > MAX_TOTAL_SIZE * 5) {
+            errorMessage.textContent = `Total file size is too large. Please select under ${MAX_TOTAL_SIZE_MB * 5} MB.`;
+            return;
+        }
+        
+        submitBtn.textContent = 'Processing...';
+        submitBtn.disabled = true;
+
+        try {
+            // Process all files in parallel for performance.
+            const processingPromises = files.map(file => processImageFile(file));
+            processedFilesCache = await Promise.all(processingPromises);
+
+            updatePreviews(processedFilesCache);
             
-            const files = Array.from(e.target.files);
-            fileCount.textContent = `${files.length} file${files.length !== 1 ? 's' : ''} selected`;
-            
-            // Calculate and display total size
-            const initialTotalSize = files.reduce((sum, file) => sum + file.size, 0);
-            totalSize.textContent = `${(initialTotalSize / 1024 / 1024).toFixed(2)} MB`;
-            
-            // Validate total size with more conservative buffer
-            if (initialTotalSize > MAX_TOTAL_SIZE * 4) {
-                errorMessage.textContent = `Total size too large. Please select less than ${MAX_TOTAL_SIZE / 1024 / 1024} MB total.`;
-                return;
+            const finalTotalSize = processedFilesCache.reduce((sum, file) => sum + file.size, 0);
+            totalSize.textContent = `Compressed size: ${(finalTotalSize / 1024 / 1024).toFixed(2)} MB`;
+
+            if (finalTotalSize > MAX_TOTAL_SIZE) {
+                errorMessage.textContent = `Total size after compression exceeds the ${MAX_TOTAL_SIZE_MB} MB limit.`;
+                submitBtn.disabled = true;
+            } else {
+                submitBtn.disabled = false;
             }
 
-            // Process and preview each file
-            for (const file of files) {
-                try {
-                    const processedFile = await processImageFile(file);
-                    previewFile(processedFile, PREVIEW_MAX_WIDTH);
-                } catch (error) {
-                    console.error('Error processing file:', error);
-                    errorMessage.textContent = `Error processing ${file.name}: ${error.message}`;
-                }
-            }
+        } catch (error) {
+            console.error('Error processing files:', error);
+            errorMessage.textContent = `An error occurred during processing: ${error.message}`;
+        } finally {
+            submitBtn.textContent = 'Upload';
+        }
+    };
+
+    /**
+     * Processes a single image file: converts HEIC and compresses.
+     * @param {File} file The file to process.
+     * @returns {Promise<File>} A promise that resolves with the processed file.
+     */
+    const processImageFile = async (file) => {
+        let processedFile = file;
+        if (isHeicFile(file)) {
+            processedFile = await convertHeicToJpeg(file);
+        }
+
+        if (processedFile.size <= MAX_FILE_SIZE) {
+            return processedFile; // No need to compress if already small enough
+        }
+        
+        return compressImage(processedFile, {
+            maxWidth: 1200,
+            maxHeight: 1200,
+            quality: 0.6,
+            maxSizeMB: MAX_FILE_SIZE_MB,
+            useWebWorker: true
         });
+    };
+    
+    /**
+     * Updates the DOM with image previews efficiently.
+     * @param {File[]} files The files to preview.
+     */
+    const updatePreviews = (files) => {
+        const fragment = document.createDocumentFragment();
+        for (const file of files) {
+            // FIX: Avoid JS destructuring syntax that confuses Go templates.
+            const previewData = createPreviewElement(file);
+            fragment.appendChild(previewData.container);
+            previewObjectUrls.push(previewData.objectUrl);
+        }
+        preview.appendChild(fragment);
+    };
 
-        async function processImageFile(file) {
-            // Skip processing if file is already small enough and not HEIC
-            if (file.size <= MAX_FILE_SIZE && !isHeicFile(file)) {
-                return file;
+    /**
+     * Creates a DOM element for a single file preview.
+     * @param {File} file The file to create a preview for.
+     * @returns {{container: HTMLElement, objectUrl: string}} The container element and the created object URL.
+     */
+    const createPreviewElement = (file) => {
+        const objectUrl = URL.createObjectURL(file);
+        
+        const container = document.createElement('div');
+        container.className = 'preview-item';
+        container.style.maxWidth = `${PREVIEW_MAX_WIDTH}px`;
+
+        const img = document.createElement('img');
+        img.src = objectUrl;
+        img.className = 'preview-image';
+        img.alt = `Preview of ${file.name}`;
+
+        const fileInfo = document.createElement('div');
+        fileInfo.className = 'file-info';
+        fileInfo.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+        
+        container.append(img, fileInfo);
+        
+        return { container, objectUrl };
+    };
+
+    /**
+     * Handles the form submission.
+     * @param {Event} e The submit event.
+     */
+    const handleFormSubmit = async (e) => {
+        e.preventDefault();
+        
+        if (processedFilesCache.length === 0) {
+            errorMessage.textContent = 'Please select files to upload.';
+            return;
+        }
+        
+        submitBtn.disabled = true;
+        uploadProgress.style.display = 'block';
+        
+        try {
+            const formData = new FormData();
+            processedFilesCache.forEach(file => {
+                formData.append('photos', file, file.name);
+            });
+
+            const totalUploadSize = processedFilesCache.reduce((sum, file) => sum + file.size, 0);
+            if (totalUploadSize > MAX_TOTAL_SIZE) {
+                throw new Error(`Total size after compression is ${(totalUploadSize / 1024 / 1024).toFixed(2)} MB, which exceeds the limit.`);
             }
 
-            // Convert HEIC to JPEG if needed (with lower quality)
-            if (isHeicFile(file)) {
-                file = await convertHeicToJpeg(file);
-            }
-
-            // Compress the image with more aggressive settings
-            return await compressImage(file, {
-                maxWidth: 1200, 
-                maxHeight: 1200, 
-                quality: 0.5, 
-                maxSizeMB: MAX_FILE_SIZE / 1024 / 1024,
-                useWebWorker: true 
-            });
-        }
-
-        function isHeicFile(file) {
-            return file.type === 'image/heic' || file.type === 'image/heif' || 
-                   file.name.toLowerCase().endsWith('.heic') || 
-                   file.name.toLowerCase().endsWith('.heif');
-        }
-
-        async function convertHeicToJpeg(file) {
-            if (typeof heic2any === 'undefined') {
-                throw new Error('HEIC conversion not supported. Please use JPEG or PNG.');
-            }
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', uploadForm.action, true);
             
-            const result = await heic2any({
-                blob: file,
-                toType: 'image/jpeg',
-                quality: 0.5 
-            });
-            
-            return new File([result], file.name.replace(/\.[^/.]+$/, '.jpg'), {
-                type: 'image/jpeg',
-                lastModified: new Date()
-            });
-        }
-
-        async function compressImage(file, options) {
-            // Use browser-image-compression if available
-            if (typeof imageCompression !== 'undefined') {
-                return await imageCompression(file, options);
-            }
-            
-            // Fallback basic compression using canvas
-            return new Promise((resolve) => {
-                const img = new Image();
-                img.src = URL.createObjectURL(file);
-                
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    
-                    // Calculate new dimensions
-                    let width = img.width;
-                    let height = img.height;
-                    
-                    if (width > options.maxWidth) {
-                        height = (height * options.maxWidth) / width;
-                        width = options.maxWidth;
-                    }
-                    
-                    if (height > options.maxHeight) {
-                        width = (width * options.maxHeight) / height;
-                        height = options.maxHeight;
-                    }
-                    
-                    canvas.width = width;
-                    canvas.height = height;
-                    
-                    // Draw and compress
-                    ctx.drawImage(img, 0, 0, width, height);
-                    
-                    canvas.toBlob((blob) => {
-                        resolve(new File([blob], file.name, {
-                            type: 'image/jpeg',
-                            lastModified: new Date()
-                        }));
-                    }, 'image/jpeg', options.quality);
-                };
-                
-                img.onerror = () => resolve(file); // Fallback to original if error
-            });
-        }
-
-        function previewFile(file, maxWidth) {
-            const imgContainer = document.createElement('div');
-            imgContainer.className = 'preview-item';
-            imgContainer.style.maxWidth = `${maxWidth}px`; // Keep this as inline style since it's dynamic
-            
-            const img = document.createElement('img');
-            img.src = URL.createObjectURL(file);
-            img.className = 'preview-image'; // Optional: if you want to add more specific styles later
-            const fileInfo = document.createElement('div');
-            fileInfo.className = 'file-info';
-            fileInfo.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
-            
-            imgContainer.appendChild(img);
-            imgContainer.appendChild(fileInfo);
-            preview.appendChild(imgContainer);
-        }
-
-        uploadForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(uploadForm);
-            const files = Array.from(fileInput.files);
-            
-            // Disable submit button during upload
-            submitBtn.disabled = true;
-            uploadProgress.style.display = 'block';
-            
-            try {
-                // Process all files first
-                const processedFiles = [];
-                for (const file of files) {
-                    const processedFile = await processImageFile(file);
-                    processedFiles.push(processedFile);
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    const percent = Math.round((event.loaded / event.total) * 100);
+                    progressBar.value = percent;
+                    progressText.textContent = `${percent}%`;
                 }
-                
-                // Replace original files with processed ones
-                formData.delete('photos');
-                processedFiles.forEach(file => {
-                    formData.append('photos', file);
-                });
-                
-                // Calculate total size after processing
-                const totalSize = processedFiles.reduce((sum, file) => sum + file.size, 0);
-                if (totalSize > MAX_TOTAL_SIZE) {
-                    throw new Error(`Total size after compression is ${(totalSize / 1024 / 1024).toFixed(2)} MB which exceeds the limit.`);
+            };
+            
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    window.location.reload();
+                } else {
+                    errorMessage.textContent = `Upload failed: ${xhr.statusText}`;
                 }
-                
-                // Submit with progress tracking
-                const xhr = new XMLHttpRequest();
-                xhr.upload.onprogress = function(e) {
-                    if (e.lengthComputable) {
-                        const percent = Math.round((e.loaded / e.total) * 100);
-                        progressBar.value = percent;
-                        progressText.textContent = `${percent}%`;
-                    }
-                };
-                
-                xhr.onload = function() {
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        window.location.reload(); // Refresh to show new upload
-                    } else {
-                        errorMessage.textContent = `Upload failed: ${xhr.statusText}`;
-                    }
-                };
-                
-                xhr.onerror = function() {
-                    errorMessage.textContent = 'Upload failed. Please try again.';
-                };
-                
-                xhr.open('POST', uploadForm.action, true);
-                xhr.send(formData);
-                
-            } catch (error) {
-                errorMessage.textContent = error.message;
+            };
+            
+            xhr.onerror = () => {
+                errorMessage.textContent = 'Upload failed due to a network error. Please try again.';
                 submitBtn.disabled = false;
                 uploadProgress.style.display = 'none';
-            }
+            };
+            
+            xhr.send(formData);
+
+        } catch (error) {
+            errorMessage.textContent = error.message;
+            submitBtn.disabled = false;
+            uploadProgress.style.display = 'none';
+        }
+    };
+
+    // --- Utility Functions ---
+
+    const isHeicFile = (file) => /\.(heic|heif)$/i.test(file.name) || /image\/(heic|heif)/.test(file.type);
+
+    const convertHeicToJpeg = async (file) => {
+        if (typeof heic2any === 'undefined') {
+            throw new Error('HEIC conversion library is not loaded.');
+        }
+        const resultBlob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.7 });
+        const newName = file.name.replace(/\.[^/.]+$/, '.jpg');
+        return new File([resultBlob], newName, { type: 'image/jpeg', lastModified: Date.now() });
+    };
+
+    const compressImage = async (file, options) => {
+        if (typeof imageCompression === 'undefined') {
+            console.warn('browser-image-compression library not found. Using basic canvas fallback.');
+            return canvasFallbackCompress(file, options);
+        }
+        return imageCompression(file, options);
+    };
+    
+    const canvasFallbackCompress = (file, options) => {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            const objectUrl = URL.createObjectURL(file);
+            img.src = objectUrl;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                let { width, height } = img;
+                
+                if (width > height) {
+                    if (width > options.maxWidth) {
+                        height = Math.round(height * options.maxWidth / width);
+                        width = options.maxWidth;
+                    }
+                } else {
+                    if (height > options.maxHeight) {
+                        width = Math.round(width * options.maxHeight / height);
+                        height = options.maxHeight;
+                    }
+                }
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob(blob => {
+                    resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
+                }, 'image/jpeg', options.quality || 0.7);
+                URL.revokeObjectURL(objectUrl);
+            };
+            img.onerror = (err) => {
+                URL.revokeObjectURL(objectUrl);
+                reject(err);
+            };
         });
-    });
+    };
+
+    // --- Event Listeners ---
+    fileInput.addEventListener('change', handleFileSelection);
+    uploadForm.addEventListener('submit', handleFormSubmit);
+});
 </script>
 <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.3/dist/heic2any.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.0/dist/browser-image-compression.min.js"></script>
