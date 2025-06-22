@@ -1,6 +1,6 @@
 # Variables
 IMAGE_NAME = salmonsalmon/portfolio-yuanyuan
-VERSION ?= v0.1.6  # Default version if not provided
+VERSION ?= v0.1.6-alpha  # Default version if not provided
 IMAGE_TAG = $(IMAGE_NAME):$(VERSION)
 LATEST_TAG = $(IMAGE_NAME):latest
 PROXY_COMPOSE_FILE = nginx-proxy-compose.yaml
@@ -45,6 +45,20 @@ undeploy:
 	@echo "Taking down the application with docker-compose"
 	docker-compose -f $(APP_COMPOSE_FILE) down
 	docker-compose -f $(PROXY_COMPOSE_FILE) down
+
+deploy-app:
+	@echo "Deploying the application with docker-compose"
+	docker-compose -f $(APP_COMPOSE_FILE) up -d 
+
+# Take down the application using docker-compose
+undeploy-app:
+	@echo "Taking down the application with docker-compose"
+	docker-compose -f $(APP_COMPOSE_FILE) down
+
+reset-app: undeploy-app clean
+
+exec:
+	@docker exec -it $$(docker ps -q -f "ancestor=$(IMAGE_TAG)") sh
 
 # Show help message
 help:

@@ -2,7 +2,7 @@ services:
   go-web-app:
     pull_policy: always
     restart: always
-    image: salmonsalmon/portfolio-yuanyuan:v0.1.6
+    image: salmonsalmon/portfolio-yuanyuan:v0.1.6-alpha
     build:
       dockerfile: Dockerfile
       context: .
