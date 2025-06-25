@@ -252,6 +252,17 @@ func getVisuals(id ...int) ([]Visual, error) {
 	return visuals, nil
 }
 
+func getVisualByID(id int) (*Visual, error) {
+	visuals, err := getVisuals(id)
+	if err != nil {
+		return nil, fmt.Errorf("getVisualByID: %w", err)
+	}
+	if len(visuals) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return &visuals[0], nil
+}
+
 func updateVisual(visual Visual) error {
 	_, err := DB.Exec(`
       UPDATE visuals

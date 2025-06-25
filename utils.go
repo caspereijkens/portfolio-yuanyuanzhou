@@ -130,33 +130,16 @@ func storeFile(fileHeader *multipart.FileHeader, config FileUploadConfig) (strin
 	return filename, nil
 }
 
+func getVisualBaseDir(vid int) string {
+	return filepath.Join(localFSDir, "visuals", strconv.Itoa(vid))
+}
+
 func cleanupVisualFiles(visual Visual) error {
-	photos, _, err := getPhotosByVisualID(visual.ID, 0, 0)
-	if err != nil {
-		return fmt.Errorf("failed to get photos for visual %d: %w", visual.ID, err)
+	visualDir := getVisualBaseDir(visual.ID)
+	err := os.RemoveAll(visualDir)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove visual directory %s: %w", visualDir, err)
 	}
-
-	for _, photo := range photos {
-		fullPath := filepath.Join(localFSDir, photo.Filename)
-		err := os.Remove(fullPath)
-		if err != nil && !os.IsNotExist(err) {
-			// Log the error but continue with other files
-			log.Printf("Warning: failed to delete photo file %s: %v", fullPath, err)
-		}
-	}
-
-	safeTitle := sanitizeFilename(visual.Title)
-	visualDir := filepath.Join(localFSDir, "visuals", safeTitle)
-
-	if isEmpty, err := isDirEmpty(visualDir); err == nil && isEmpty {
-		err = os.Remove(visualDir)
-		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("failed to remove visual directory %s: %w", visualDir, err)
-		}
-	} else if err != nil {
-		log.Printf("Warning: failed to check if directory %s is empty: %v", visualDir, err)
-	}
-
 	return nil
 }
 
