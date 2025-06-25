@@ -506,31 +506,67 @@ func handleListVisuals(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func visualsApiHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost:
-		handlePostVisualPhotos(w, r)
-	case http.MethodGet:
-		handleGetVisualPhotos(w, r)
-	case http.MethodDelete:
-		handleDeleteVisualPhoto(w, r)
-	default:
+func createVisualHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
+	handlePostVisualPhotos(w, r)
 }
 
-func handleGetVisualPhotos(w http.ResponseWriter, r *http.Request) {
-	pathParts := strings.Split(r.URL.Path, "/")
-	if len(pathParts) < 4 { // Expects /api/v1/visuals/{id}
-		http.Error(w, "Invalid URL format", http.StatusBadRequest)
-		return
-	}
-	visualID, err := strconv.Atoi(pathParts[3])
-	if err != nil {
-		http.Error(w, "Invalid visual ID", http.StatusBadRequest)
+func visualsApiHandler(w http.ResponseWriter, r *http.Request) {
+	trimmedPath := strings.TrimPrefix(r.URL.Path, "/api/v1/visuals/")
+	parts := strings.Split(trimmedPath, "/")
+
+	if len(parts) == 1 && parts[0] == "" {
+		http.Error(w, "Listing visuals via API is not supported", http.StatusMethodNotAllowed)
 		return
 	}
 
+	visualID, err := strconv.Atoi(parts[0])
+	if err != nil {
+		http.Error(w, "Invalid visual ID in path", http.StatusBadRequest)
+		return
+	}
+
+	if len(parts) == 1 {
+		switch r.Method {
+		case http.MethodPatch:
+			handlePatchVisual(w, r)
+		case http.MethodDelete:
+			handleDeleteVisual(w, r)
+		default:
+			http.Error(w, "Method not allowed on this resource", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+
+	if len(parts) > 1 && parts[1] == "photos" {
+		if len(parts) == 2 { // /api/v1/visuals/{id}/photos
+			if r.Method == http.MethodGet {
+				handleGetVisualPhotos(w, r, visualID)
+			} else {
+				http.Error(w, "Method not allowed on photos collection", http.StatusMethodNotAllowed)
+			}
+		} else if len(parts) == 3 { // /api/v1/visuals/{id}/photos/{pid}
+			photoID, err := strconv.Atoi(parts[2])
+			if err != nil {
+				http.Error(w, "Invalid photo ID in path", http.StatusBadRequest)
+				return
+			}
+			if r.Method == http.MethodDelete {
+				handleDeleteVisualPhoto(w, r, visualID, photoID)
+			} else {
+				http.Error(w, "Method not allowed on photo resource", http.StatusMethodNotAllowed)
+			}
+		}
+		return
+	}
+
+	http.NotFound(w, r)
+}
+
+func handleGetVisualPhotos(w http.ResponseWriter, r *http.Request, visualID int) {
 	page, perPage := getPaginationParams(r)
 	offset := (page - 1) * perPage
 
@@ -541,15 +577,12 @@ func handleGetVisualPhotos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	visualsApiEndpoint := fmt.Sprintf("/api/v1/visuals/%d/photos/", visualID)
-
 	photoResponses := make([]photoResponse, len(photos))
 	for i, p := range photos {
-		originalPath := filepath.Join(visualsApiEndpoint, p.Filename)
 		photoResponses[i] = photoResponse{
 			ID:         p.ID,
 			Filename:   p.Filename,
-			Thumbnails: generateThumbnailPaths(originalPath),
+			Thumbnails: generateThumbnailPaths(filepath.Join("visuals", strconv.Itoa(visualID), p.Filename)),
 		}
 	}
 
@@ -588,7 +621,6 @@ func handlePostVisualPhotos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Insert visual first to get an ID
 	vid, err := insertVisual(visual)
 	if err != nil {
 		http.Error(w, "Failed to save visual", http.StatusInternalServerError)
@@ -621,7 +653,6 @@ func handlePostVisualPhotos(w http.ResponseWriter, r *http.Request) {
 		photoFilenames = append(photoFilenames, filename)
 	}
 
-	// Then insert photos
 	if len(photoFilenames) > 0 {
 		err = insertPhotos(vid, photoFilenames)
 		if err != nil {
@@ -635,27 +666,7 @@ func handlePostVisualPhotos(w http.ResponseWriter, r *http.Request) {
 
 	http.Redirect(w, r, fmt.Sprintf("/visuals/%d", vid), http.StatusSeeOther)
 }
-func handleDeleteVisualPhoto(w http.ResponseWriter, r *http.Request) {
-	// The URL path is expected to be in the format: /api/v1/visuals/{visualID}/photos/{photoID}
-	pathParts := strings.Split(r.URL.Path, "/")
-	if len(pathParts) < 6 {
-		log.Printf("Error: Invalid URL format received: %s", r.URL.Path)
-		http.Error(w, "Invalid URL format. Expected /api/v1/visuals/{vid}/photos/{pid}", http.StatusBadRequest)
-		return
-	}
-
-	visualID, err := strconv.Atoi(pathParts[3])
-	if err != nil {
-		http.Error(w, "Invalid visual ID in URL", http.StatusBadRequest)
-		return
-	}
-
-	photoID, err := strconv.Atoi(pathParts[5])
-	if err != nil {
-		http.Error(w, "Invalid photo ID in URL", http.StatusBadRequest)
-		return
-	}
-
+func handleDeleteVisualPhoto(w http.ResponseWriter, r *http.Request, visualID int, photoID int) {
 	photo, err := getPhotoByID(photoID)
 	if err != nil {
 		if err == sql.ErrNoRows {
