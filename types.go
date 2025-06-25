@@ -89,14 +89,18 @@ type visualData struct {
 	Visual Visual
 }
 
+type ThumbnailConfig struct {
+	Name      string
+	Width     int
+	Quality   int
+}
+
 type FileUploadConfig struct {
 	AllowedTypes        map[string]bool
 	DestinationDir      string
 	MaxSize             int64
 	Filename            string
-	ThumbnailLargeSize  int
-	ThumbnailMediumSize int
-	ThumbnailSmallSize  int
+	Thumbnails          []ThumbnailConfig
 }
 
 type thumbnailPaths struct {

@@ -75,9 +75,7 @@ func handlePostIndex(w http.ResponseWriter, r *http.Request) {
 	filename, err := storeFile(fileHeader, FileUploadConfig{
 		AllowedTypes:        allowedImageMIMETypes,
 		DestinationDir:      fmt.Sprintf("%s/covers", localFSDir),
-		ThumbnailSmallSize:  150,
-		ThumbnailMediumSize: 600,
-		ThumbnailLargeSize:  1080,
+		Thumbnails:          thumbnailConfigs,
 	})
 	if err != nil {
 		http.Error(w, "Failed to save file", http.StatusInternalServerError)
@@ -385,6 +383,15 @@ func handleGetVisual(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func getVisualUploadConfig(visualDir string) FileUploadConfig {
+	return FileUploadConfig{
+		AllowedTypes:   allowedImageMIMETypes,
+		DestinationDir: visualDir,
+		MaxSize:        2_000_000,
+		Thumbnails:     thumbnailConfigs,
+	}
+}
+
 func handlePatchVisual(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseMultipartForm(10 << 20)
 	if err != nil {
@@ -416,14 +423,7 @@ func handlePatchVisual(w http.ResponseWriter, r *http.Request) {
 
 	var newPhotoFilenames []string
 	if files := r.MultipartForm.File["photos"]; len(files) > 0 {
-		config := FileUploadConfig{
-			AllowedTypes:        allowedImageMIMETypes,
-			DestinationDir:      visualDir,
-			MaxSize:             2_000_000,
-			ThumbnailLargeSize:  1080,
-			ThumbnailMediumSize: 600,
-			ThumbnailSmallSize:  150,
-		}
+		config := getVisualUploadConfig(visualDir)
 		for _, fileHeader := range files {
 			filename, err := storeFile(fileHeader, config)
 			if err != nil {
@@ -609,14 +609,7 @@ func handlePostVisualPhotos(w http.ResponseWriter, r *http.Request) {
 	files := r.MultipartForm.File["photos"]
 
 	for _, fileHeader := range files {
-		config := FileUploadConfig{
-			AllowedTypes:        allowedImageMIMETypes,
-			DestinationDir:      visualDir,
-			MaxSize:             2_000_000,
-			ThumbnailLargeSize:  1080,
-			ThumbnailMediumSize: 600,
-			ThumbnailSmallSize:  150,
-		}
+		config := getVisualUploadConfig(visualDir)
 
 		filename, err := storeFile(fileHeader, config)
 		if err != nil {

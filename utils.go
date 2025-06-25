@@ -204,55 +204,29 @@ func getPaginationParams(r *http.Request) (int, int) {
 	return page, perPage
 }
 
+var thumbnailConfigs = []ThumbnailConfig{
+	{Name: "small", Width: 150, Quality: 80},
+	{Name: "medium", Width: 600, Quality: 80},
+	{Name: "large", Width: 1080, Quality: 80},
+}
+
 func generateAndSaveThumbnail(imagePath string, config FileUploadConfig) error {
 	img, err := imaging.Open(imagePath, imaging.AutoOrientation(true))
 	if err != nil {
 		return fmt.Errorf("error opening image for thumbnail: %v", err)
 	}
 
-	err = saveThumbnail(img, config.ThumbnailMediumSize, "medium", imagePath)
-	if err != nil {
-		log.Printf("Warning: failed to generate medium thumbnail for %s: %v", imagePath, err)
-	}
-
-	err = saveThumbnail(img, config.ThumbnailSmallSize, "small", imagePath)
-	if err != nil {
-		log.Printf("Warning: failed to generate small thumbnail for %s: %v", imagePath, err)
-	}
-
-	err = saveResizedImage(img, config.ThumbnailLargeSize, "large", imagePath)
-	if err != nil {
-		log.Printf("Warning: failed to generate large thumbnail for %s: %v", imagePath, err)
+	for _, thumbConfig := range config.Thumbnails {
+		err = saveResizedImage(img, thumbConfig.Width, thumbConfig.Name, imagePath, thumbConfig.Quality)
+		if err != nil {
+			log.Printf("Warning: failed to generate %s thumbnail for %s: %v", thumbConfig.Name, imagePath, err)
+		}
 	}
 
 	return nil // Return nil as long as the original file was saved.
 }
 
-func saveThumbnail(img image.Image, size int, sizeName string, originalImagePath string) error {
-	thumb := imaging.Thumbnail(img, size, size, imaging.Lanczos)
-	thumbDir := filepath.Join(filepath.Dir(originalImagePath), "thumbnails", sizeName)
-	if err := os.MkdirAll(thumbDir, 0755); err != nil {
-		return fmt.Errorf("error creating %s thumbnail directory: %v", sizeName, err)
-	}
-	thumbPath := filepath.Join(thumbDir, filepath.Base(originalImagePath))
-
-	// Save as JPEG with a quality setting
-	outFile, err := os.Create(thumbPath)
-	if err != nil {
-		return fmt.Errorf("error creating output file for %s thumbnail: %v", sizeName, err)
-	}
-	defer outFile.Close()
-
-	// Adjust quality as needed (0-100, higher is better quality but larger size)
-	err = jpeg.Encode(outFile, thumb, &jpeg.Options{Quality: 80})
-	if err != nil {
-		return fmt.Errorf("error saving %s thumbnail as JPEG: %v", sizeName, err)
-	}
-
-	return nil
-}
-
-func saveResizedImage(img image.Image, width int, sizeName, originalImagePath string) error {
+func saveResizedImage(img image.Image, width int, sizeName, originalImagePath string, quality int) error {
 	resizedImg := imaging.Resize(img, width, 0, imaging.Lanczos)
 
 	thumbDir := filepath.Join(filepath.Dir(originalImagePath), "thumbnails", sizeName)
@@ -267,8 +241,8 @@ func saveResizedImage(img image.Image, width int, sizeName, originalImagePath st
 	}
 	defer outFile.Close()
 
-	// Save as JPEG with 80% quality.
-	err = jpeg.Encode(outFile, resizedImg, &jpeg.Options{Quality: 80})
+	// Save as JPEG with a quality setting
+	err = jpeg.Encode(outFile, resizedImg, &jpeg.Options{Quality: quality})
 	if err != nil {
 		return fmt.Errorf("error saving %s thumbnail as JPEG: %v", sizeName, err)
 	}
