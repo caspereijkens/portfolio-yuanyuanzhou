@@ -375,7 +375,7 @@ func deletePhoto(id int) error {
 	return err
 }
 
-func insertPhotos(visualID int, filenames[]string) error {
+func insertPhotos(visualID int, filenames []string) error {
 	tx, err := DB.Begin()
 	if err != nil {
 		return fmt.Errorf("insertPhotos begin tx: %w", err)

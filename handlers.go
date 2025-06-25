@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -8,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"database/sql"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -73,9 +73,9 @@ func handlePostIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filename, err := storeFile(fileHeader, FileUploadConfig{
-		AllowedTypes:        allowedImageMIMETypes,
-		DestinationDir:      fmt.Sprintf("%s/covers", localFSDir),
-		Thumbnails:          thumbnailConfigs,
+		AllowedTypes:   allowedImageMIMETypes,
+		DestinationDir: fmt.Sprintf("%s/covers", localFSDir),
+		Thumbnails:     thumbnailConfigs,
 	})
 	if err != nil {
 		http.Error(w, "Failed to save file", http.StatusInternalServerError)
@@ -506,7 +506,6 @@ func handleListVisuals(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-
 func visualsApiHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
@@ -521,54 +520,54 @@ func visualsApiHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleGetVisualPhotos(w http.ResponseWriter, r *http.Request) {
-    pathParts := strings.Split(r.URL.Path, "/")
-    if len(pathParts) < 4 { // Expects /api/v1/visuals/{id}
-        http.Error(w, "Invalid URL format", http.StatusBadRequest)
-        return
-    }
-    visualID, err := strconv.Atoi(pathParts[3])
-    if err != nil {
-        http.Error(w, "Invalid visual ID", http.StatusBadRequest)
-        return
-    }
+	pathParts := strings.Split(r.URL.Path, "/")
+	if len(pathParts) < 4 { // Expects /api/v1/visuals/{id}
+		http.Error(w, "Invalid URL format", http.StatusBadRequest)
+		return
+	}
+	visualID, err := strconv.Atoi(pathParts[3])
+	if err != nil {
+		http.Error(w, "Invalid visual ID", http.StatusBadRequest)
+		return
+	}
 
-    page, perPage := getPaginationParams(r)
-    offset := (page - 1) * perPage
+	page, perPage := getPaginationParams(r)
+	offset := (page - 1) * perPage
 
-    photos, totalCount, err := getPhotosByVisualID(visualID, offset, perPage)
-    if err != nil {
-        log.Printf("Error retrieving photos: %v", err)
-        http.Error(w, "Failed to retrieve photos", http.StatusInternalServerError)
-        return
-    }
+	photos, totalCount, err := getPhotosByVisualID(visualID, offset, perPage)
+	if err != nil {
+		log.Printf("Error retrieving photos: %v", err)
+		http.Error(w, "Failed to retrieve photos", http.StatusInternalServerError)
+		return
+	}
 
 	visualsApiEndpoint := fmt.Sprintf("/api/v1/visuals/%d/photos/", visualID)
 
-    photoResponses := make([]photoResponse, len(photos))
-    for i, p := range photos {
-        originalPath := filepath.Join(visualsApiEndpoint, p.Filename)
-        photoResponses[i] = photoResponse{
-            ID:         p.ID,
-            Filename:   p.Filename,
-            Thumbnails: generateThumbnailPaths(originalPath), 
-        }
-    }
-
-    totalPages := 0
-    if totalCount > 0 {
-				totalPages = (totalCount + perPage - 1) / perPage
+	photoResponses := make([]photoResponse, len(photos))
+	for i, p := range photos {
+		originalPath := filepath.Join(visualsApiEndpoint, p.Filename)
+		photoResponses[i] = photoResponse{
+			ID:         p.ID,
+			Filename:   p.Filename,
+			Thumbnails: generateThumbnailPaths(originalPath),
 		}
-    finalResponse := map[string]any{
-        "photos": photoResponses,
-        "pagination": map[string]any{
-            "total":        totalCount,
-            "per_page":     perPage,
-            "current_page": page,
-            "total_pages":  totalPages,
-        },
-    }
+	}
 
-    respondWithJSON(w, http.StatusOK, finalResponse)
+	totalPages := 0
+	if totalCount > 0 {
+		totalPages = (totalCount + perPage - 1) / perPage
+	}
+	finalResponse := map[string]any{
+		"photos": photoResponses,
+		"pagination": map[string]any{
+			"total":        totalCount,
+			"per_page":     perPage,
+			"current_page": page,
+			"total_pages":  totalPages,
+		},
+	}
+
+	respondWithJSON(w, http.StatusOK, finalResponse)
 }
 
 func handlePostVisualPhotos(w http.ResponseWriter, r *http.Request) {
@@ -782,19 +781,18 @@ func thumbnailsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleGetThumbnail(w http.ResponseWriter, r *http.Request) {
-    filePath := r.URL.Query().Get("path")
+	filePath := r.URL.Query().Get("path")
 
-    cleanedPath, err := validateAndCleanPath(filePath)
-    if err != nil {
-        if strings.Contains(err.Error(), "not found") {
-            http.Error(w, err.Error(), http.StatusNotFound)
-        } else {
-            http.Error(w, err.Error(), http.StatusBadRequest)
-        }
-        return
-    }
+	cleanedPath, err := validateAndCleanPath(filePath)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			http.Error(w, err.Error(), http.StatusNotFound)
+		} else {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+		return
+	}
 
-    thumbnails := generateThumbnailPaths(cleanedPath)
-    respondWithJSON(w, http.StatusOK, thumbnails)
+	thumbnails := generateThumbnailPaths(cleanedPath)
+	respondWithJSON(w, http.StatusOK, thumbnails)
 }
-

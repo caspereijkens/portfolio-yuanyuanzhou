@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"image"
 	"image/jpeg"
@@ -9,7 +10,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
-	"encoding/json"
 	"strconv"
 	"strings"
 
@@ -256,39 +256,39 @@ func thumbnailPath(photoPath, size string) string {
 }
 
 func generateThumbnailPaths(originalRelativePath string) thumbnailPaths {
-    return thumbnailPaths{
-        Small:  "/fs" + thumbnailPath(originalRelativePath, "small"),
-        Medium: "/fs" + thumbnailPath(originalRelativePath, "medium"),
-        Large:  "/fs" + thumbnailPath(originalRelativePath, "large"),
-    }
+	return thumbnailPaths{
+		Small:  "/fs" + thumbnailPath(originalRelativePath, "small"),
+		Medium: "/fs" + thumbnailPath(originalRelativePath, "medium"),
+		Large:  "/fs" + thumbnailPath(originalRelativePath, "large"),
+	}
 }
 
 func respondWithJSON(w http.ResponseWriter, statusCode int, payload interface{}) {
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(statusCode)
-    if err := json.NewEncoder(w).Encode(payload); err != nil {
-        log.Printf("Error encoding JSON response: %v", err)
-    }
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	if err := json.NewEncoder(w).Encode(payload); err != nil {
+		log.Printf("Error encoding JSON response: %v", err)
+	}
 }
 
 func validateAndCleanPath(userPath string) (string, error) {
-    if userPath == "" {
-        return "", fmt.Errorf("missing 'path' query parameter")
-    }
+	if userPath == "" {
+		return "", fmt.Errorf("missing 'path' query parameter")
+	}
 
-    cleanedPath := filepath.Clean(userPath)
-    if strings.Contains(cleanedPath, "..") {
-        return "", fmt.Errorf("invalid file path (contains '..')")
-    }
+	cleanedPath := filepath.Clean(userPath)
+	if strings.Contains(cleanedPath, "..") {
+		return "", fmt.Errorf("invalid file path (contains '..')")
+	}
 
-    fullPath := filepath.Join(localFSDir, cleanedPath)
-    if !strings.HasPrefix(fullPath, localFSDir) {
-        return "", fmt.Errorf("invalid file path (outside of base directory)")
-    }
+	fullPath := filepath.Join(localFSDir, cleanedPath)
+	if !strings.HasPrefix(fullPath, localFSDir) {
+		return "", fmt.Errorf("invalid file path (outside of base directory)")
+	}
 
-    if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-        return "", fmt.Errorf("source file not found")
-    }
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		return "", fmt.Errorf("source file not found")
+	}
 
-    return cleanedPath, nil
+	return cleanedPath, nil
 }

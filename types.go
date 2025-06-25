@@ -90,28 +90,27 @@ type visualData struct {
 }
 
 type ThumbnailConfig struct {
-	Name      string
-	Width     int
-	Quality   int
+	Name    string
+	Width   int
+	Quality int
 }
 
 type FileUploadConfig struct {
-	AllowedTypes        map[string]bool
-	DestinationDir      string
-	MaxSize             int64
-	Filename            string
-	Thumbnails          []ThumbnailConfig
+	AllowedTypes   map[string]bool
+	DestinationDir string
+	MaxSize        int64
+	Filename       string
+	Thumbnails     []ThumbnailConfig
 }
 
 type thumbnailPaths struct {
-    Small  string `json:"small"`
-    Medium string `json:"medium"`
-    Large  string `json:"large"`
+	Small  string `json:"small"`
+	Medium string `json:"medium"`
+	Large  string `json:"large"`
 }
 
 type photoResponse struct {
-    ID         int            `json:"id"`
-    Filename   string         `json:"filename"`
-    Thumbnails thumbnailPaths `json:"thumbnails"`
+	ID         int            `json:"id"`
+	Filename   string         `json:"filename"`
+	Thumbnails thumbnailPaths `json:"thumbnails"`
 }
-
