@@ -1,15 +1,14 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
-	"math"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"database/sql"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -30,16 +29,24 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleGetIndex(w http.ResponseWriter, r *http.Request) {
-	filePath, err := getLatestCoverPath()
+	filename, err := getLatestCoverFilename()
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return
+		}
 		http.Error(w, "Failed to fetch cover data", http.StatusInternalServerError)
 		return
 	}
-	cover := Cover{
-		FilePath: filePath,
-	}
+	const coversDir = "covers"
+	originalPath := filepath.Join(coversDir, filename)
+	largeThumbPath := thumbnailPath(originalPath, "large")
 	_, loggedIn := getLoginStatus(r)
-	err = TPL.ExecuteTemplate(w, "index.gohtml", coverData{Login: loggedIn, Cover: cover})
+	data := coverData{
+		Login:             loggedIn,
+		OriginalCoverPath: originalPath,
+		LargeCoverPath:    largeThumbPath,
+	}
+	err = TPL.ExecuteTemplate(w, "index.gohtml", data)
 	if err != nil {
 		http.Error(w, "Failed to render template", http.StatusInternalServerError)
 	}
@@ -65,17 +72,19 @@ func handlePostIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filePath, err := storeFile(fileHeader, FileUploadConfig{
-		AllowedTypes:   allowedImageMIMETypes,
-		DestinationDir: fmt.Sprintf("./%s/covers", localFSDir),
-		MaxSize:        2_000_000,
+	filename, err := storeFile(fileHeader, FileUploadConfig{
+		AllowedTypes:        allowedImageMIMETypes,
+		DestinationDir:      fmt.Sprintf("%s/covers", localFSDir),
+		ThumbnailSmallSize:  150,
+		ThumbnailMediumSize: 600,
+		ThumbnailLargeSize:  1080,
 	})
 	if err != nil {
 		http.Error(w, "Failed to save file", http.StatusInternalServerError)
 		return
 	}
 
-	_, err = DB.Exec("INSERT INTO covers (file_path) VALUES (?)", filePath)
+	_, err = DB.Exec("INSERT INTO covers (file_path) VALUES (?)", filename) // Or `(filename)`
 	if err != nil {
 		http.Error(w, "Failed to update database", http.StatusInternalServerError)
 		return
@@ -356,7 +365,7 @@ func handleGetVisual(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/visuals", http.StatusSeeOther)
 		return
 	}
-	visuals, err := getVisuals(id) 
+	visuals, err := getVisuals(id)
 	if err != nil {
 		log.Printf("Error retrieving visual: %v", err)
 		http.Error(w, "Failed to retrieve visual work", http.StatusInternalServerError)
@@ -364,9 +373,9 @@ func handleGetVisual(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(visuals) == 0 {
 		log.Printf("Could not find visual with id '%d'", id)
-		http.NotFound(w, r) 
+		http.NotFound(w, r)
 		return
-	} 	
+	}
 
 	_, loggedIn := getLoginStatus(r)
 
@@ -405,14 +414,15 @@ func handlePatchVisual(w http.ResponseWriter, r *http.Request) {
 	safeTitle := sanitizeFilename(updatedVisual.Title)
 	visualDir := filepath.Join(localFSDir, "visuals", safeTitle)
 
-	var newPhotoPaths []string
+	var newPhotoFilenames []string
 	if files := r.MultipartForm.File["photos"]; len(files) > 0 {
 		config := FileUploadConfig{
-			AllowedTypes:   allowedImageMIMETypes,
-			DestinationDir: visualDir,
-			MaxSize:        2_000_000,
-			ThumbnailMediumSize: 120,
-			ThumbnailSmallSize: 30,
+			AllowedTypes:        allowedImageMIMETypes,
+			DestinationDir:      visualDir,
+			MaxSize:             2_000_000,
+			ThumbnailLargeSize:  1080,
+			ThumbnailMediumSize: 600,
+			ThumbnailSmallSize:  150,
 		}
 		for _, fileHeader := range files {
 			filePath, err := storeFile(fileHeader, config)
@@ -422,7 +432,7 @@ func handlePatchVisual(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Error storing file", http.StatusInternalServerError)
 				return
 			}
-			newPhotoPaths = append(newPhotoPaths, filePath)
+			newPhotoFilenames = append(newPhotoFilenames, filePath)
 		}
 	}
 
@@ -435,8 +445,8 @@ func handlePatchVisual(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Insert new photos if any
-	if len(newPhotoPaths) > 0 {
-		err = insertPhotos(visualID, newPhotoPaths)
+	if len(newPhotoFilenames) > 0 {
+		err = insertPhotos(visualID, newPhotoFilenames)
 		if err != nil {
 			log.Printf("Error inserting new photos: %v", err)
 		}
@@ -479,8 +489,6 @@ func listVisualsHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		handleListVisuals(w, r)
-	case http.MethodPost:
-		handlePostVisual(w, r)
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -501,7 +509,78 @@ func handleListVisuals(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handlePostVisual(w http.ResponseWriter, r *http.Request) {
+
+func visualPhotosHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		handleGetVisualPhotos(w, r)
+	case http.MethodPost:
+		handlePostVisualPhotos(w, r)
+	case http.MethodDelete:
+		handleDeleteVisualPhoto(w, r)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func handleGetVisualPhotos(w http.ResponseWriter, r *http.Request) {
+    pathParts := strings.Split(r.URL.Path, "/")
+    if len(pathParts) < 5 { // Expects /api/v1/visuals/{id}/photos
+        http.Error(w, "Invalid URL format", http.StatusBadRequest)
+        return
+    }
+    visualID, err := strconv.Atoi(pathParts[3])
+    if err != nil {
+        http.Error(w, "Invalid visual ID", http.StatusBadRequest)
+        return
+    }
+
+    visuals, err := getVisuals(visualID)
+    if err != nil || len(visuals) == 0 {
+        http.Error(w, "Visual not found", http.StatusNotFound)
+        return
+    }
+    visual := visuals[0]
+    visualBasePath := filepath.Join("visuals", sanitizeFilename(visual.Title))
+
+    page, perPage := getPaginationParams(r)
+    offset := (page - 1) * perPage
+
+    photos, totalCount, err := getPhotosByVisualID(visualID, offset, perPage)
+    if err != nil {
+        log.Printf("Error retrieving photos: %v", err)
+        http.Error(w, "Failed to retrieve photos", http.StatusInternalServerError)
+        return
+    }
+
+    photoResponses := make([]photoResponse, len(photos))
+    for i, p := range photos {
+        originalPath := filepath.Join(visualBasePath, p.Filename)
+        photoResponses[i] = photoResponse{
+            ID:         p.ID,
+            Filename:   p.Filename,
+            Thumbnails: generateThumbnailPaths(originalPath), 
+        }
+    }
+
+    totalPages := 0
+    if totalCount > 0 {
+				totalPages = (totalCount + perPage - 1) / perPage
+		}
+    finalResponse := map[string]any{
+        "photos": photoResponses,
+        "pagination": map[string]any{
+            "total":        totalCount,
+            "per_page":     perPage,
+            "current_page": page,
+            "total_pages":  totalPages,
+        },
+    }
+
+    respondWithJSON(w, http.StatusOK, finalResponse)
+}
+
+func handlePostVisualPhotos(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseMultipartForm(10 << 20) // 10 MB max
 	if err != nil {
 		log.Printf("Error parsing form: %v", err)
@@ -533,11 +612,12 @@ func handlePostVisual(w http.ResponseWriter, r *http.Request) {
 
 	for _, fileHeader := range files {
 		config := FileUploadConfig{
-			AllowedTypes:   allowedImageMIMETypes,
-			DestinationDir: visualDir,
-			MaxSize:        2_000_000,
-			ThumbnailMediumSize: 120,
-			ThumbnailSmallSize: 30,
+			AllowedTypes:        allowedImageMIMETypes,
+			DestinationDir:      visualDir,
+			MaxSize:             2_000_000,
+			ThumbnailLargeSize:  1080,
+			ThumbnailMediumSize: 600,
+			ThumbnailSmallSize:  150,
 		}
 
 		filePath, err := storeFile(fileHeader, config)
@@ -576,94 +656,61 @@ func handlePostVisual(w http.ResponseWriter, r *http.Request) {
 
 	http.Redirect(w, r, fmt.Sprintf("/visuals/%d", id), http.StatusSeeOther)
 }
-
-func photosHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		handleGetPhotos(w, r)
-	case http.MethodDelete:
-		handleDeletePhoto(w, r)
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-func handleGetPhotos(w http.ResponseWriter, r *http.Request) {
-	// Extract visual ID from URL path like "/photos/visual/123"
-	parts := strings.Split(r.URL.Path, "/")
-	if len(parts) < 4 || parts[2] != "visual" {
-		http.Error(w, "Invalid URL format", http.StatusBadRequest)
+func handleDeleteVisualPhoto(w http.ResponseWriter, r *http.Request) {
+	// The URL path is expected to be in the format: /api/v1/visuals/{visualID}/photos/{photoID}
+	pathParts := strings.Split(r.URL.Path, "/")
+	if len(pathParts) < 6 {
+		log.Printf("Error: Invalid URL format received: %s", r.URL.Path)
+		http.Error(w, "Invalid URL format. Expected /api/v1/visuals/{vid}/photos/{pid}", http.StatusBadRequest)
 		return
 	}
 
-	visualID, err := strconv.Atoi(parts[3])
+	visualID, err := strconv.Atoi(pathParts[3])
 	if err != nil {
-		http.Error(w, "Invalid visual ID", http.StatusBadRequest)
+		http.Error(w, "Invalid visual ID in URL", http.StatusBadRequest)
 		return
 	}
 
-	page, perPage := getPaginationParams(r)
-	offset := (page - 1) * perPage
-
-	photos, totalCount, err := getPhotosByVisualID(visualID, offset, perPage)
+	photoID, err := strconv.Atoi(pathParts[5])
 	if err != nil {
-		log.Printf("Error retrieving photos: %v", err)
-		http.Error(w, "Failed to retrieve photos", http.StatusInternalServerError)
+		http.Error(w, "Invalid photo ID in URL", http.StatusBadRequest)
 		return
 	}
 
-	response := map[string]interface{}{
-		"photos": photos,
-		"pagination": map[string]interface{}{
-			"page":        page,
-			"per_page":    perPage,
-			"total":       totalCount,
-			"total_pages": int(math.Ceil(float64(totalCount) / float64(perPage))),
-		},
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
-}
-
-func handleDeletePhoto(w http.ResponseWriter, r *http.Request) {
-	// Extract photo ID from URL path like "/photos/123"
-	parts := strings.Split(r.URL.Path, "/")
-	if len(parts) < 3 {
-		http.Error(w, "Invalid URL format", http.StatusBadRequest)
+	visuals, err := getVisuals(visualID)
+	if err != nil || len(visuals) == 0 {
+		http.Error(w, "Visual not found for the given ID", http.StatusNotFound)
 		return
 	}
+	visual := visuals[0]
 
-	photoID, err := strconv.Atoi(parts[2])
-	if err != nil {
-		http.Error(w, "Invalid photo ID", http.StatusBadRequest)
-		return
-	}
-
-	// Get photo info first to find the file path
 	photo, err := getPhotoByID(photoID)
 	if err != nil {
 		http.Error(w, "Photo not found", http.StatusNotFound)
 		return
 	}
 
-	// Delete from database
-	err = deletePhoto(photoID)
-
-	if err != nil {
-		log.Printf("Error deleting photo from DB: %v", err)
-		http.Error(w, "Failed to delete photo", http.StatusInternalServerError)
+	if photo.VisualID != visualID {
+		log.Printf("Security alert: Attempt to delete photo %d from visual %d, but it belongs to visual %d.", photoID, visualID, photo.VisualID)
+		http.Error(w, "Forbidden: Photo does not belong to the specified visual.", http.StatusForbidden)
 		return
 	}
 
-	// Delete the actual file
-	err = os.Remove(filepath.Join(localFSDir, photo.FilePath))
-	if err != nil {
-		log.Printf("Error deleting photo file: %v", err)
-		// Continue even if file deletion fails as DB record is already gone
+	if err := deletePhoto(photoID); err != nil {
+		log.Printf("Error deleting photo record from DB for ID %d: %v", photoID, err)
+		http.Error(w, "Failed to delete photo from database", http.StatusInternalServerError)
+		return
 	}
 
-	log.Printf("Successfully deleted photo with id '%d' at '%s'", photoID, photo.FilePath)
+	visualBasePath := filepath.Join("visuals", sanitizeFilename(visual.Title))
+	fullPhotoPath := filepath.Join(localFSDir, visualBasePath, photo.Filename)
+
+	err = os.Remove(fullPhotoPath)
+	if err != nil {
+		log.Printf("Warning: Failed to delete photo file at '%s': %v. The database record was deleted.", fullPhotoPath, err)
+	} 
+
+	log.Printf("Successfully deleted photo with id '%d' from visual '%d'", photoID, visualID)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -731,6 +778,7 @@ func requireAuth(next http.HandlerFunc) http.HandlerFunc {
 		next(w, r)
 	}
 }
+
 func methodOverride(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
@@ -747,43 +795,29 @@ func methodOverride(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-
 func thumbnailsHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		handleGetVisualThumbnails(w, r)
+		handleGetThumbnail(w, r)
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
-func handleGetVisualThumbnails(w http.ResponseWriter, r *http.Request) {
-	// Extract visual ID from URL path like "/thumbnails/visual/123"
-	parts := strings.Split(r.URL.Path, "/")
-	if len(parts) < 4 || parts[2] != "visual" {
-		http.Error(w, "Invalid URL format", http.StatusBadRequest)
-		return
-	}
+func handleGetThumbnail(w http.ResponseWriter, r *http.Request) {
+    filePath := r.URL.Query().Get("path")
 
-	visualID, err := strconv.Atoi(parts[3])
-	if err != nil {
-		http.Error(w, "Invalid visual ID", http.StatusBadRequest)
-		return
-	}
+    cleanedPath, err := validateAndCleanPath(filePath)
+    if err != nil {
+        if strings.Contains(err.Error(), "not found") {
+            http.Error(w, err.Error(), http.StatusNotFound)
+        } else {
+            http.Error(w, err.Error(), http.StatusBadRequest)
+        }
+        return
+    }
 
-	photos, _, err := getPhotosByVisualID(visualID, 0, 0)
-	if err != nil {
-		http.Error(w, "Failed to load thumbnails", http.StatusInternalServerError)
-		return
-	}
-
-	thumbnails := []string{}
-	for _, photo := range photos {
-		smallThumb := "/fs" + thumbnailPath(photo.FilePath, "small")
-		thumbnails = append(thumbnails, smallThumb)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(thumbnails)
+    thumbnails := generateThumbnailPaths(cleanedPath)
+    respondWithJSON(w, http.StatusOK, thumbnails)
 }
 

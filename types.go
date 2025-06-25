@@ -40,7 +40,7 @@ type Visual struct {
 type Photo struct {
 	ID        int       `json:"id"`
 	VisualID  int       `json:"visual_id"`
-	FilePath  string    `json:"file_path"`
+	Filename  string    `json:"file_path"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -54,8 +54,9 @@ type loginData struct {
 }
 
 type coverData struct {
-	Login bool
-	Cover Cover
+	Login             bool
+	OriginalCoverPath string
+	LargeCoverPath    string
 }
 
 type infoData struct {
@@ -89,10 +90,24 @@ type visualData struct {
 }
 
 type FileUploadConfig struct {
-    AllowedTypes        map[string]bool
-    DestinationDir      string
-    MaxSize             int64
-    Filename            string
-    ThumbnailMediumSize int 
-    ThumbnailSmallSize  int 
+	AllowedTypes        map[string]bool
+	DestinationDir      string
+	MaxSize             int64
+	Filename            string
+	ThumbnailLargeSize  int
+	ThumbnailMediumSize int
+	ThumbnailSmallSize  int
 }
+
+type thumbnailPaths struct {
+    Small  string `json:"small"`
+    Medium string `json:"medium"`
+    Large  string `json:"large"`
+}
+
+type photoResponse struct {
+    ID         int            `json:"id"`
+    Filename   string         `json:"filename"`
+    Thumbnails thumbnailPaths `json:"thumbnails"`
+}
+

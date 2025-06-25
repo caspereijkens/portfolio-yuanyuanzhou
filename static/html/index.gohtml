@@ -3,7 +3,9 @@
 {{ template "head" "Yuanyuan Zhou" }}
     <body>
         {{template "navbar" .Login }}
-        <img src="/fs{{.Cover.FilePath}}" alt="Cover image">
+        <img src="/fs/{{.LargeCoverPath}}"
+     onerror="this.onerror=null;this.src='/fs/{{.OriginalCoverPath}}';"
+     alt="Cover image">
         
         {{if .Login}}
         <div class="upload-section">

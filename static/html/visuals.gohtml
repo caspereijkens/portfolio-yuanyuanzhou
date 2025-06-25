@@ -13,7 +13,7 @@
     {{if .Login}}
         <div class="upload-section">
             <h2>Add New Visual</h2>
-            <form id="uploadForm" action="/visuals" method="POST" enctype="multipart/form-data">
+            <form id="uploadForm" action="/api/v1/visuals" method="POST" enctype="multipart/form-data">
                 <div class="form-group">
                     <label for="title">Title:</label>
                     <input type="text" id="title" name="title" placeholder="Enter work title" required>

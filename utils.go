@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"image"
 	"image/jpeg"
+	"io"
 	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
+	"encoding/json"
 	"strconv"
 	"strings"
 
@@ -18,9 +19,9 @@ import (
 
 	"path/filepath"
 
+	"github.com/disintegration/imaging"
 	_ "github.com/mattn/go-sqlite3"
 	uuid "github.com/satori/go.uuid"
-	"github.com/disintegration/imaging"
 )
 
 func determinePort() string {
@@ -117,19 +118,16 @@ func storeFile(fileHeader *multipart.FileHeader, config FileUploadConfig) (strin
 		}
 	}
 
-	// Save original file
 	filePath := filepath.Join(config.DestinationDir, filename)
 	if err := saveFile(file, filePath); err != nil {
 		return "", fmt.Errorf("error saving file: %v", err)
 	}
 
-	// === Generate Thumbnail ===
 	if err := generateAndSaveThumbnail(filePath, config); err != nil {
 		log.Printf("Warning: thumbnail generation failed: %v", err)
 	}
 
-	// Return path relative to localFSDir
-	return strings.TrimPrefix(filePath, localFSDir), nil
+	return filename, nil
 }
 
 func cleanupVisualFiles(visual Visual) error {
@@ -139,7 +137,7 @@ func cleanupVisualFiles(visual Visual) error {
 	}
 
 	for _, photo := range photos {
-		fullPath := filepath.Join(localFSDir, photo.FilePath)
+		fullPath := filepath.Join(localFSDir, photo.Filename)
 		err := os.Remove(fullPath)
 		if err != nil && !os.IsNotExist(err) {
 			// Log the error but continue with other files
@@ -224,22 +222,27 @@ func getPaginationParams(r *http.Request) (int, int) {
 }
 
 func generateAndSaveThumbnail(imagePath string, config FileUploadConfig) error {
-	img, err := imaging.Open(imagePath)
+	img, err := imaging.Open(imagePath, imaging.AutoOrientation(true))
 	if err != nil {
 		return fmt.Errorf("error opening image for thumbnail: %v", err)
 	}
 
 	err = saveThumbnail(img, config.ThumbnailMediumSize, "medium", imagePath)
 	if err != nil {
-		return err
+		log.Printf("Warning: failed to generate medium thumbnail for %s: %v", imagePath, err)
 	}
 
 	err = saveThumbnail(img, config.ThumbnailSmallSize, "small", imagePath)
 	if err != nil {
-		return err
+		log.Printf("Warning: failed to generate small thumbnail for %s: %v", imagePath, err)
 	}
 
-	return nil
+	err = saveResizedImage(img, config.ThumbnailLargeSize, "large", imagePath)
+	if err != nil {
+		log.Printf("Warning: failed to generate large thumbnail for %s: %v", imagePath, err)
+	}
+
+	return nil // Return nil as long as the original file was saved.
 }
 
 func saveThumbnail(img image.Image, size int, sizeName string, originalImagePath string) error {
@@ -266,8 +269,69 @@ func saveThumbnail(img image.Image, size int, sizeName string, originalImagePath
 	return nil
 }
 
+func saveResizedImage(img image.Image, width int, sizeName, originalImagePath string) error {
+	resizedImg := imaging.Resize(img, width, 0, imaging.Lanczos)
+
+	thumbDir := filepath.Join(filepath.Dir(originalImagePath), "thumbnails", sizeName)
+	if err := os.MkdirAll(thumbDir, 0755); err != nil {
+		return fmt.Errorf("error creating %s thumbnail directory: %v", sizeName, err)
+	}
+
+	thumbPath := filepath.Join(thumbDir, filepath.Base(originalImagePath))
+	outFile, err := os.Create(thumbPath)
+	if err != nil {
+		return fmt.Errorf("error creating output file for %s thumbnail: %v", sizeName, err)
+	}
+	defer outFile.Close()
+
+	// Save as JPEG with 80% quality.
+	err = jpeg.Encode(outFile, resizedImg, &jpeg.Options{Quality: 80})
+	if err != nil {
+		return fmt.Errorf("error saving %s thumbnail as JPEG: %v", sizeName, err)
+	}
+	return nil
+}
+
 func thumbnailPath(photoPath, size string) string {
 	dir := filepath.Dir(photoPath)
 	filename := filepath.Base(photoPath)
 	return filepath.Join(dir, "thumbnails", size, filename)
+}
+
+func generateThumbnailPaths(originalRelativePath string) thumbnailPaths {
+    return thumbnailPaths{
+        Small:  "/fs" + thumbnailPath(originalRelativePath, "small"),
+        Medium: "/fs" + thumbnailPath(originalRelativePath, "medium"),
+        Large:  "/fs" + thumbnailPath(originalRelativePath, "large"),
+    }
+}
+
+func respondWithJSON(w http.ResponseWriter, statusCode int, payload interface{}) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(statusCode)
+    if err := json.NewEncoder(w).Encode(payload); err != nil {
+        log.Printf("Error encoding JSON response: %v", err)
+    }
+}
+
+func validateAndCleanPath(userPath string) (string, error) {
+    if userPath == "" {
+        return "", fmt.Errorf("missing 'path' query parameter")
+    }
+
+    cleanedPath := filepath.Clean(userPath)
+    if strings.Contains(cleanedPath, "..") {
+        return "", fmt.Errorf("invalid file path (contains '..')")
+    }
+
+    fullPath := filepath.Join(localFSDir, cleanedPath)
+    if !strings.HasPrefix(fullPath, localFSDir) {
+        return "", fmt.Errorf("invalid file path (outside of base directory)")
+    }
+
+    if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+        return "", fmt.Errorf("source file not found")
+    }
+
+    return cleanedPath, nil
 }
