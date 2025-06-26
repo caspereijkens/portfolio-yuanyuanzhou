@@ -44,7 +44,7 @@ func main() {
 	mux.HandleFunc("/stories", requireAuthUnlessGet(listStoriesHandler))
 	mux.HandleFunc("/api/v1/thumbnails/", requireAuthUnlessGet(thumbnailsHandler))
 	mux.HandleFunc("/api/v1/visuals", requireAuth(createVisualHandler))
-	mux.HandleFunc("/api/v1/visuals/", requireAuthUnlessGet(visualsApiHandler))
+	mux.HandleFunc("/api/v1/visuals/", methodOverride(requireAuthUnlessGet(visualsApiHandler)))
 	mux.HandleFunc("/visuals/", methodOverride(requireAuthUnlessGet(visualsHandler)))
 	mux.HandleFunc("/visuals", requireAuthUnlessGet(listVisualsHandler))
 	mux.HandleFunc("/info", methodOverride(requireAuthUnlessGet(infoHandler)))

@@ -519,7 +519,11 @@ func visualsApiHandler(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(trimmedPath, "/")
 
 	if len(parts) == 1 && parts[0] == "" {
-		http.Error(w, "Listing visuals via API is not supported", http.StatusMethodNotAllowed)
+		if r.Method == http.MethodPost {
+			handlePostVisualPhotos(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
 		return
 	}
 
@@ -531,6 +535,8 @@ func visualsApiHandler(w http.ResponseWriter, r *http.Request) {
 
 	if len(parts) == 1 {
 		switch r.Method {
+		case http.MethodGet:
+			handleGetVisualPhotos(w, r, visualID)
 		case http.MethodPatch:
 			handlePatchVisual(w, r)
 		case http.MethodDelete:

@@ -80,13 +80,20 @@
     // ... other unchanged functions ...
     
     function setupScrollListener() {
-        // ... no changes needed ...
+        window.addEventListener('scroll', checkScrollPosition, { passive: true });
     }
+
     function checkViewportFill() {
-        // ... no changes needed ...
+        const container = document.getElementById('photos-container');
+        if (container.getBoundingClientRect().bottom < window.innerHeight + 200) {
+            loadPhotos();
+        }
     }
+
     function checkScrollPosition() {
-        // ... no changes needed ...
+        if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
+            loadPhotos();
+        }
     }
 
     document.addEventListener('submit', async function(e) {
