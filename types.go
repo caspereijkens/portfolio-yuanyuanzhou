@@ -57,6 +57,7 @@ type coverData struct {
 	Login             bool
 	OriginalCoverPath string
 	LargeCoverPath    string
+	MediumCoverPath   string
 }
 
 type infoData struct {

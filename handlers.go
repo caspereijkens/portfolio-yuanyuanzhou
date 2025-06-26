@@ -40,11 +40,13 @@ func handleGetIndex(w http.ResponseWriter, r *http.Request) {
 	const coversDir = "covers"
 	originalPath := filepath.Join(coversDir, filename)
 	largeThumbPath := thumbnailPath(originalPath, "large")
+	mediumThumbPath := thumbnailPath(originalPath, "medium")
 	_, loggedIn := getLoginStatus(r)
 	data := coverData{
 		Login:             loggedIn,
 		OriginalCoverPath: originalPath,
 		LargeCoverPath:    largeThumbPath,
+		MediumCoverPath:   mediumThumbPath,
 	}
 	err = TPL.ExecuteTemplate(w, "index.gohtml", data)
 	if err != nil {

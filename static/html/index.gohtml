@@ -3,9 +3,13 @@
 {{ template "head" "Yuanyuan Zhou" }}
     <body>
         {{template "navbar" .Login }}
-        <img src="/fs/{{.LargeCoverPath}}"
-     onerror="this.onerror=null;this.src='/fs/{{.OriginalCoverPath}}';"
-     alt="Cover image">
+        <div class="cover-container">
+    <img src="/fs/{{.MediumCoverPath}}" 
+         data-large-src="/fs/{{.LargeCoverPath}}" 
+         alt="Cover image" 
+         class="cover-image"
+         onload="this.onload=null; const largeImg = new Image(); largeImg.src=this.dataset.largeSrc; largeImg.onload=() => {this.src=largeImg.src;}">
+</div>
         
         {{if .Login}}
         <div class="upload-section">
