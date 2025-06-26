@@ -30,10 +30,11 @@
                 // We'll use the small thumbnail for the grid and store the large one
                 // in a data attribute for lightbox/fullscreen functionality.
                 photoDiv.innerHTML = `
-                    <img src="${photo.thumbnails.small}"
+                    <img src="${photo.thumbnails.medium}"
                          data-large-src="${photo.thumbnails.large}"
                          alt="Photo"
                          loading="lazy"
+                         onload="this.onload=null; const largeImg = new Image(); largeImg.src=this.dataset.largeSrc; largeImg.onload=() => {this.src=largeImg.src;}"
                          onclick="showLargeImage(this.dataset.largeSrc)">
                     {{ if .Login }}
                     <form class="delete-photo-form" onsubmit="return confirm('Delete this photo?')">
