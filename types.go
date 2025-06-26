@@ -91,9 +91,10 @@ type visualData struct {
 }
 
 type ThumbnailConfig struct {
-	Name    string
-	Width   int
-	Quality int
+	Name      string
+	Width     int
+	Quality   int
+	Crop      bool
 }
 
 type FileUploadConfig struct {
@@ -105,9 +106,10 @@ type FileUploadConfig struct {
 }
 
 type thumbnailPaths struct {
-	Small  string `json:"small"`
-	Medium string `json:"medium"`
-	Large  string `json:"large"`
+    Mini   string `json:"mini"`
+    Small  string `json:"small"`
+    Medium string `json:"medium"`
+    Large  string `json:"large"`
 }
 
 type photoResponse struct {

@@ -115,3 +115,33 @@ article img {
     padding: 10px 0;
     justify-content: start;
 }
+
+.thumb-grid .photo-container {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    margin: 2px;
+    display: inline-block;
+}
+
+.thumb-grid .mini-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 2px;
+    display: block;
+}
+
+.thumb-grid .medium-preview {
+    position: absolute;
+    top: -50px;
+    left: -50px;
+    width: 150px;
+    height: 150px;
+    object-fit: cover;
+    display: none;
+    z-index: 10;
+    border: 1px solid black;
+    border-radius: 4px;
+    pointer-events: none;
+}

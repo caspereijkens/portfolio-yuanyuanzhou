@@ -205,6 +205,7 @@ func getPaginationParams(r *http.Request) (int, int) {
 }
 
 var thumbnailConfigs = []ThumbnailConfig{
+	{Name: "mini", Width: 40, Quality: 80, Crop: true},
 	{Name: "small", Width: 150, Quality: 80},
 	{Name: "medium", Width: 600, Quality: 80},
 	{Name: "large", Width: 1080, Quality: 80},
@@ -217,13 +218,41 @@ func generateAndSaveThumbnail(imagePath string, config FileUploadConfig) error {
 	}
 
 	for _, thumbConfig := range config.Thumbnails {
-		err = saveResizedImage(img, thumbConfig.Width, thumbConfig.Name, imagePath, thumbConfig.Quality)
+		if thumbConfig.Crop {
+			err = saveCroppedThumbnail(img, thumbConfig.Width, thumbConfig.Name, imagePath, thumbConfig.Quality)
+		} else {
+			err = saveResizedImage(img, thumbConfig.Width, thumbConfig.Name, imagePath, thumbConfig.Quality)
+		}
 		if err != nil {
 			log.Printf("Warning: failed to generate %s thumbnail for %s: %v", thumbConfig.Name, imagePath, err)
 		}
 	}
 
 	return nil // Return nil as long as the original file was saved.
+}
+
+func saveCroppedThumbnail(img image.Image, size int, sizeName string, originalImagePath string, quality int) error {
+	thumb := imaging.Fill(img, size, size, imaging.Center, imaging.Lanczos)
+	thumbDir := filepath.Join(filepath.Dir(originalImagePath), "thumbnails", sizeName)
+	if err := os.MkdirAll(thumbDir, 0755); err != nil {
+		return fmt.Errorf("error creating %s thumbnail directory: %v", sizeName, err)
+	}
+	thumbPath := filepath.Join(thumbDir, filepath.Base(originalImagePath))
+
+	// Save as JPEG with a quality setting
+	outFile, err := os.Create(thumbPath)
+	if err != nil {
+		return fmt.Errorf("error creating output file for %s thumbnail: %v", sizeName, err)
+	}
+	defer outFile.Close()
+
+	// Adjust quality as needed (0-100, higher is better quality but larger size)
+	err = jpeg.Encode(outFile, thumb, &jpeg.Options{Quality: quality})
+	if err != nil {
+		return fmt.Errorf("error saving %s thumbnail as JPEG: %v", sizeName, err)
+	}
+
+	return nil
 }
 
 func saveResizedImage(img image.Image, width int, sizeName, originalImagePath string, quality int) error {
@@ -257,6 +286,7 @@ func thumbnailPath(photoPath, size string) string {
 
 func generateThumbnailPaths(originalRelativePath string) thumbnailPaths {
     return thumbnailPaths{
+        Mini:   "/fs/" + thumbnailPath(originalRelativePath, "mini"),
         Small:  "/fs/" + thumbnailPath(originalRelativePath, "small"),
         Medium: "/fs/" + thumbnailPath(originalRelativePath, "medium"),
         Large:  "/fs/" + thumbnailPath(originalRelativePath, "large"),
