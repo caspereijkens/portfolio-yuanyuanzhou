@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".thumb-grid").forEach(async (div) => {
         const visualId = div.dataset.id;
         try {
-            const res = await fetch(`/api/v1/visuals/${visualId}/photos?per_page=5`);
+            const res = await fetch(`/api/v1/visuals/${visualId}/photos`);
             const data = await res.json();
             const thumbs = data.photos;
             const fragment = document.createDocumentFragment(); // Create a document fragment
@@ -12,8 +12,8 @@ document.addEventListener("DOMContentLoaded", () => {
             for (const photo of thumbs) {
                 const container = document.createElement("div");
                 container.style.position = "relative";
-                container.style.width = "40px";
-                container.style.height = "40px";
+                container.style.width = "30px";
+                container.style.height = "30px";
                 container.style.margin = "2px";
                 container.style.display = "inline-block";
 
@@ -27,7 +27,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 miniImg.style.width = "100%";
                 miniImg.style.height = "100%";
                 miniImg.style.objectFit = "cover";
-                miniImg.style.borderRadius = "2px";
                 const mediumImg = document.createElement("img");
                 mediumImg.src = photo.thumbnails.medium;
                 mediumImg.style.position = "absolute";

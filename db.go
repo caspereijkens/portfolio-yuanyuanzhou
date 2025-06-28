@@ -334,7 +334,7 @@ func getPhotosByVisualID(visualID, offset, limit int) ([]Photo, int, error) {
     `
 	args := []interface{}{visualID}
 
-	if limit > 0 {
+	if limit >= 0 {
 		query += " LIMIT ? OFFSET ?"
 		args = append(args, limit, offset)
 	}
@@ -345,7 +345,11 @@ func getPhotosByVisualID(visualID, offset, limit int) ([]Photo, int, error) {
 	}
 	defer rows.Close()
 
-	photos := make([]Photo, 0, limit)
+	var photos []Photo
+	if limit > 0 {
+		photos = make([]Photo, 0, limit)
+	}
+
 	for rows.Next() {
 		var p Photo
 		if err := rows.Scan(&p.ID, &p.VisualID, &p.Filename, &p.CreatedAt); err != nil {

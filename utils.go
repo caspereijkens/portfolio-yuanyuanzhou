@@ -187,7 +187,7 @@ func getLoginStatus(req *http.Request) (*int, bool) {
 
 func getPaginationParams(r *http.Request) (int, int) {
 	page := 1
-	perPage := 10
+	perPage := -1 // Default to -1 (no limit) if not specified
 
 	if p := r.URL.Query().Get("page"); p != "" {
 		if val, err := strconv.Atoi(p); err == nil && val > 0 {
@@ -196,9 +196,15 @@ func getPaginationParams(r *http.Request) (int, int) {
 	}
 
 	if pp := r.URL.Query().Get("per_page"); pp != "" {
-		if val, err := strconv.Atoi(pp); err == nil && val > 0 && val <= 100 {
-			perPage = val
+		if val, err := strconv.Atoi(pp); err == nil && val > 0 {
+			if val <= 100 {
+				perPage = val
+			} else {
+				perPage = 100 // Max per page
+			}
 		}
+	} else {
+		// If per_page is not provided, we keep it at -1 to signify no limit.
 	}
 
 	return page, perPage

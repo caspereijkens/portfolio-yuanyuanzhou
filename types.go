@@ -58,6 +58,7 @@ type coverData struct {
 	OriginalCoverPath string
 	LargeCoverPath    string
 	MediumCoverPath   string
+	Visuals           []Visual
 }
 
 type infoData struct {

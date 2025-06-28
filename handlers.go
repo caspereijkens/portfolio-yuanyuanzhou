@@ -31,12 +31,19 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 func handleGetIndex(w http.ResponseWriter, r *http.Request) {
 	filename, err := getLatestCoverFilename()
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err != sql.ErrNoRows {
+			http.Error(w, "Failed to fetch cover data", http.StatusInternalServerError)
 			return
 		}
-		http.Error(w, "Failed to fetch cover data", http.StatusInternalServerError)
+	}
+
+	visuals, err := getVisuals()
+	if err != nil {
+		http.Error(w, "Failed to retrieve visuals", http.StatusInternalServerError)
+		log.Printf("Error retrieving visuals: %v", err)
 		return
 	}
+
 	const coversDir = "covers"
 	originalPath := filepath.Join(coversDir, filename)
 	largeThumbPath := thumbnailPath(originalPath, "large")
@@ -47,6 +54,7 @@ func handleGetIndex(w http.ResponseWriter, r *http.Request) {
 		OriginalCoverPath: originalPath,
 		LargeCoverPath:    largeThumbPath,
 		MediumCoverPath:   mediumThumbPath,
+		Visuals:           visuals,
 	}
 	err = TPL.ExecuteTemplate(w, "index.gohtml", data)
 	if err != nil {
