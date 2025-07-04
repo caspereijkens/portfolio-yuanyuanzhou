@@ -4,11 +4,12 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".thumb-grid").forEach(async (div) => {
         const visualId = div.dataset.id;
         try {
-            const res = await fetch(`/thumbnails/visual/${visualId}`);
-            const thumbs = await res.json();
+            const res = await fetch(`/api/v1/visuals/${visualId}/photos`);
+            const data = await res.json();
+            const thumbs = data.photos;
             const fragment = document.createDocumentFragment(); // Create a document fragment
 
-            for (const src of thumbs) {
+            for (const photo of thumbs) {
                 const container = document.createElement("div");
                 container.style.position = "relative";
                 container.style.width = "30px";
@@ -16,24 +17,23 @@ document.addEventListener("DOMContentLoaded", () => {
                 container.style.margin = "2px";
                 container.style.display = "inline-block";
 
-                const smallImg = document.createElement("img");
-                smallImg.src = src;
+                const miniImg = document.createElement("img");
+                miniImg.src = photo.thumbnails.mini;
 
-                smallImg.loading = "lazy";
-                smallImg.title = "Click to view";
-                smallImg.style.display = "block";
+                miniImg.loading = "lazy";
+                miniImg.title = "Click to view";
+                miniImg.style.display = "block";
 
-                smallImg.style.width = "100%";
-                smallImg.style.height = "100%";
-                smallImg.style.objectFit = "cover";
-                smallImg.style.borderRadius = "2px";
+                miniImg.style.width = "100%";
+                miniImg.style.height = "100%";
+                miniImg.style.objectFit = "cover";
                 const mediumImg = document.createElement("img");
-                mediumImg.src = src.replace("/small/", "/medium/");
+                mediumImg.src = photo.thumbnails.medium;
                 mediumImg.style.position = "absolute";
-                mediumImg.style.top = "-45px";
-                mediumImg.style.left = "-45px";
-                mediumImg.style.width = "120px";
-                mediumImg.style.height = "120px";
+                mediumImg.style.top = "-50px";
+                mediumImg.style.left = "-50px";
+                mediumImg.style.width = "150px";
+                mediumImg.style.height = "150px";
                 mediumImg.style.objectFit = "cover";
                 mediumImg.style.display = "none";
                 mediumImg.style.zIndex = "10";
@@ -42,16 +42,22 @@ document.addEventListener("DOMContentLoaded", () => {
                 mediumImg.style.loading = "lazy";
                 mediumImg.style.pointerEvents = "none";
 
-                container.addEventListener("mouseenter", () => {
-                    mediumImg.style.display = "block";
-                });
-                container.addEventListener("mouseleave", () => {
-                    mediumImg.style.display = "none";
-                });
+                // Differentiate between touch and non-touch devices
+                const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-                container.onclick = () => window.location.href = `/visuals/${visualId}`;
+                if (isTouchDevice) {
+                    container.onclick = () => window.location.href = `/visuals/${visualId}`;
+                } else {
+                    container.addEventListener("mouseenter", () => {
+                        mediumImg.style.display = "block";
+                    });
+                    container.addEventListener("mouseleave", () => {
+                        mediumImg.style.display = "none";
+                    });
+                    container.onclick = () => window.location.href = `/visuals/${visualId}`;
+                }
 
-                container.appendChild(smallImg);
+                container.appendChild(miniImg);
                 container.appendChild(mediumImg);
                 fragment.appendChild(container); // Append to the fragment
             }

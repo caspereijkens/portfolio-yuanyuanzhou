@@ -1,0 +1,85 @@
+{{define "upload-section"}}
+<div class="upload-section">
+    <h2>Upload New Cover</h2>
+    <form id="uploadForm" action="/" method="POST" enctype="multipart/form-data">
+        <div>
+            <label>Select Cover Image:</label>
+            <input 
+                type="file" 
+                id="photos"  
+                name="cover" 
+                accept="image/*,.heic,.heif" 
+                required
+            >
+            <div id="fileInfo">
+                <span id="fileCount">0 files selected</span>
+                <span id="totalSize">0 MB</span>
+            </div>
+            <div id="preview" style="display: flex; gap: 10px; margin-top: 10px;"></div>
+            <div id="uploadProgress" style="display: none;">
+                <progress value="0" max="100"></progress>
+                <span id="progressText">0%</span>
+            </div>
+            <div id="errorMessage" style="color: red;"></div>
+            <small>Max 10MB</small>
+        </div>
+        <div>
+            <button type="submit" id="submitBtn">Upload</button>
+        </div>
+    </form>
+</div>
+<div class="upload-section">
+    <h2>Add New Visual</h2>
+    <form id="uploadForm" action="/api/v1/visuals" method="POST" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="title">Title:</label>
+            <input type="text" id="title" name="title" placeholder="Enter work title" required>
+        </div>
+
+        <div class="form-group">
+            <label for="description">Description:</label>
+            <textarea id="description" name="description" placeholder="Describe your work..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="photos">Upload Photos (Max 10 MB total after compression):</label>
+            <input 
+                type="file" 
+                id="photos" 
+                name="photos" 
+                accept="image/*,.heic,.heif" 
+                multiple 
+                required
+            >
+            <div class="file-info">
+                <span id="fileCount">0 files selected</span>
+                <span id="totalSize">0 MB</span>
+            </div>
+            <div id="preview" class="preview-container"></div>
+            <div id="uploadProgress" class="progress-container" style="display: none;">
+                <progress value="0" max="100"></progress>
+                <span id="progressText">0%</span>
+            </div>
+            <div id="errorMessage" class="error-message"></div>
+        </div>
+        
+        <div class="form-group">
+            <button type="submit" id="submitBtn">Submit Visual</button>
+        </div>
+    </form>
+</div>
+<div class="upload-section"> 
+    <h2>Add New Story</h2>
+    <form action="/stories" method="POST">
+        <div>
+            <input type="text" name="title" placeholder="Title" required>
+        </div>
+        <div>
+            <textarea name="content" placeholder="Your story..." required></textarea>
+        </div>
+        <div>
+            <button type="submit">Submit</button>
+        </div>
+    </form>
+</div>
+{{end}}

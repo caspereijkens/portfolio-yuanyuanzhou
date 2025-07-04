@@ -1,14 +1,6 @@
 {{ define "navbar" }}
-<h1>Yuanyuan Zhou</h1>
-<pre>
-<a href="/">~</a>
-<a href="/visuals">visual/</a>
-<a href="/stories">stories/</a>
-<a href="/info">info</a>
-<a href="/portfolio" target="_blank">portfolio</a>
-{{ if eq true . }}
-<a href="/portfolio/upload">post new portfolio</a>
-<a href="/logout">logout</a>
-{{ end }}
-</pre>
+<div class="sticky-banner">
+    <a href="/info">[Info]</a>
+    <a href="/portfolio">[Download portfolio]</a>
+</div>
 {{ end }}

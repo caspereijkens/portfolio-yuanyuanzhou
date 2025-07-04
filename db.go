@@ -69,11 +69,11 @@ func configDatabase() error {
 		}
 	}
 
-	if err := ensureDefaultExists("covers", "file_path", "covers/cover.png"); err != nil {
-	    return err
+	if err := ensureDefaultExists("covers", "file_path", "cover.png"); err != nil {
+		return err
 	}
 	if err := ensureDefaultExists("portfolios", "file_path", "portfolios/portfolio.pdf"); err != nil {
-	    return err
+		return err
 	}
 
 	return nil
@@ -94,7 +94,7 @@ func ensureDefaultExists(table, column, value string) error {
 	return nil
 }
 
-func getLatestCoverPath() (string, error) {
+func getLatestCoverFilename() (string, error) {
 	var filePath string
 	err := DB.QueryRow("SELECT file_path FROM covers ORDER BY created_at DESC LIMIT 1").Scan(&filePath)
 	if err != nil {
@@ -133,7 +133,7 @@ func updateInfo(info Info) error {
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-    return fmt.Errorf("updateInfo (rows affected): %v", err)
+		return fmt.Errorf("updateInfo (rows affected): %v", err)
 	}
 	if rowsAffected == 0 {
 		return fmt.Errorf("no rows updated - either story doesn't exist or user doesn't have permission")
@@ -149,7 +149,7 @@ func getStories(id ...int) ([]Story, error) {
 	query = "SELECT id, title, content, created_at FROM stories"
 
 	if len(id) > 0 {
-    query += " WHERE id = ?"
+		query += " WHERE id = ?"
 		args = append(args, id[0])
 	}
 
@@ -225,7 +225,7 @@ func getLatestPortfolioPath() (string, error) {
 
 func getVisuals(id ...int) ([]Visual, error) {
 	query := "SELECT id, title, description, created_at, updated_at FROM visuals"
-	var args []interface{}
+	var args []any
 
 	if len(id) > 0 {
 		query += " WHERE id = ?"
@@ -250,6 +250,17 @@ func getVisuals(id ...int) ([]Visual, error) {
 	}
 
 	return visuals, nil
+}
+
+func getVisualByID(id int) (*Visual, error) {
+	visuals, err := getVisuals(id)
+	if err != nil {
+		return nil, fmt.Errorf("getVisualByID: %w", err)
+	}
+	if len(visuals) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return &visuals[0], nil
 }
 
 func updateVisual(visual Visual) error {
@@ -323,7 +334,7 @@ func getPhotosByVisualID(visualID, offset, limit int) ([]Photo, int, error) {
     `
 	args := []interface{}{visualID}
 
-	if limit > 0 {
+	if limit >= 0 {
 		query += " LIMIT ? OFFSET ?"
 		args = append(args, limit, offset)
 	}
@@ -334,10 +345,14 @@ func getPhotosByVisualID(visualID, offset, limit int) ([]Photo, int, error) {
 	}
 	defer rows.Close()
 
-	photos := make([]Photo, 0, limit)
+	var photos []Photo
+	if limit > 0 {
+		photos = make([]Photo, 0, limit)
+	}
+
 	for rows.Next() {
 		var p Photo
-		if err := rows.Scan(&p.ID, &p.VisualID, &p.FilePath, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.VisualID, &p.Filename, &p.CreatedAt); err != nil {
 			return nil, 0, fmt.Errorf("getPhotosByVisualID scan: %w", err)
 		}
 		photos = append(photos, p)
@@ -351,7 +366,7 @@ func getPhotoByID(id int) (*Photo, error) {
 	row := DB.QueryRow(query, id)
 
 	var p Photo
-	err := row.Scan(&p.ID, &p.VisualID, &p.FilePath, &p.CreatedAt)
+	err := row.Scan(&p.ID, &p.VisualID, &p.Filename, &p.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("getPhotoByID: %w", err)
 	}
@@ -364,7 +379,7 @@ func deletePhoto(id int) error {
 	return err
 }
 
-func insertPhotos(visualID int, filePaths []string) error {
+func insertPhotos(visualID int, filenames []string) error {
 	tx, err := DB.Begin()
 	if err != nil {
 		return fmt.Errorf("insertPhotos begin tx: %w", err)
@@ -377,8 +392,8 @@ func insertPhotos(visualID int, filePaths []string) error {
 	}
 	defer stmt.Close()
 
-	for _, path := range filePaths {
-		_, err = stmt.Exec(visualID, path)
+	for _, filename := range filenames {
+		_, err = stmt.Exec(visualID, filename)
 		if err != nil {
 			tx.Rollback()
 			return fmt.Errorf("insertPhotos exec: %w", err)
@@ -393,7 +408,7 @@ func getCredentials(email string) (*int, []byte, error) {
 	var passwordDigest []byte
 	err := DB.QueryRow("SELECT id, password_digest FROM users WHERE email=?;", email).Scan(&userId, &passwordDigest)
 	if errors.Is(err, sql.ErrNoRows) {
-	    return nil, nil, fmt.Errorf("user not found")
+		return nil, nil, fmt.Errorf("user not found")
 	}
 	if passwordDigest == nil {
 		log.Println("getCredentials: password digest not found")
