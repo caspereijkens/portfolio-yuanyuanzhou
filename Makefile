@@ -61,8 +61,8 @@ exec:
 	@docker exec -it $$(docker ps -q -f "ancestor=$(IMAGE_TAG)") sh
 
 build-ops-bins:
-	@go build -o bin/cleanup-filepaths  ops/cleanup-filepaths/main.go
-	@go build -o bin/make-thumbnails  ops/make-thumbnails/main.go
+	@CGO_ENABLED=0 GOOS=linux go build -o bin/cleanup-filepaths  ops/cleanup-filepaths/main.go
+	@CGO_ENABLED=0 GOOS=linux go build -o bin/make-thumbnails  ops/make-thumbnails/main.go
 
 # Show help message
 help:
