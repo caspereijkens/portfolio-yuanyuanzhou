@@ -1,121 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 {{ template "head" "Yuanyuan Zhou" }}
-<style>
-    .main-container {
-        display: flex;
-        flex-wrap: wrap;
-        padding: 10px;
-        margin: 10px;
-    }
-    .cover-container {
-        flex: 1 1 100%;
-        padding: 10px;
-        margin: 10px;
-    }
-    .visuals-container {
-        flex: 2 1 100%;
-        padding: 10px;
-        margin: 10px;
-    }
-    .visual-item {
-        margin-bottom: 20px;
-        border-top: 1px solid #eee;
-        padding-top: 20px;
-    }
-    .thumb-grid {
-        margin-bottom: 10px;
-    }
-    .visual-info {
-        display: flex;
-        justify-content: space-between;
-    }
-    .visual-title {
-        text-align: left;
-        font-size: 14px;
-        text-transform: lowercase;
-        flex-basis: 33%;
-    }
-    .visual-details {
-        text-align: left;
-        font-size: 14px;
-        text-transform: lowercase;
-        flex-basis: 67%;
-    }
-    @media (min-width: 768px) {
-        .main-container {
-            flex-wrap: nowrap;
-        }
-        .cover-container {
-            flex: 1 1 33%;
-        }
-        .visuals-container {
-            flex: 2 1 67%;
-        }
-    }
-</style>
 <body>
-    <div class="main-container">
-        <div class="cover-container">
-            <img src="/fs/{{.MediumCoverPath}}" 
-                 data-large-src="/fs/{{.LargeCoverPath}}" 
-                 alt="Cover image" 
-                 class="cover-image"
-                 onload="this.onload=null; const largeImg = new Image(); largeImg.src=this.dataset.largeSrc; largeImg.onload=() => {this.src=largeImg.src;}">
-        </div>
-        <div class="visuals-container">
-            {{ range .Visuals -}}
-            <div class="visual-item">
-                <div class="thumb-grid" data-id="{{ .ID }}"></div>
-                <div class="visual-info">
-                    <div class="visual-title">
-                      <p>{{.Title}}</p>
-                    </div>
-                    <div class="visual-details">
-                        <p>
-                        Yuanyuan Zhou<br> 
-                        {{.CreatedAt.Year}}
-                        </p>
-                        <p>{{.Description}}</p>
-                    </div>
-                </div>
-            </div>
-            {{ end -}}
-        </div>
-    </div>
-    
+    {{ template "main-content" .}}
     {{if .Login}}
-    <div class="upload-section">
-        <h2>Upload New Cover</h2>
-        <form id="uploadForm" action="/" method="POST" enctype="multipart/form-data">
-            <div>
-                <label>Select Cover Image:</label>
-                <input 
-                    type="file" 
-                    id="photos"  
-                    name="cover" 
-                    accept="image/*,.heic,.heif" 
-                    required
-                >
-                <div id="fileInfo">
-                    <span id="fileCount">0 files selected</span>
-                    <span id="totalSize">0 MB</span>
-                </div>
-                <div id="preview" style="display: flex; gap: 10px; margin-top: 10px;"></div>
-                <div id="uploadProgress" style="display: none;">
-                    <progress value="0" max="100"></progress>
-                    <span id="progressText">0%</span>
-                </div>
-                <div id="errorMessage" style="color: red;"></div>
-                <small>Max 10MB</small>
-            </div>
-            <div>
-                <button type="submit" id="submitBtn">Upload</button>
-            </div>
-        </form>
-    </div>
+    {{ template "upload-section" . }}
     {{ template "browser-image-compression-script" }}
     {{end}}
     {{ template "thumbnail-loading-script" }}
+    {{ template "navbar" . }}
 </body>
 </html>

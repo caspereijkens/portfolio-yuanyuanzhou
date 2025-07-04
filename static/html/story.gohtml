@@ -2,7 +2,7 @@
 <html lang="en">
 {{ template "head" .Story.Title }}
     <body>
-    {{template "navbar" .Login }}
+    {{ template "back-button" }}
     <h2>{{.Story.Title}}</h2>
 
     <div class="timestamp">{{.Story.CreatedAt.Format "Jan 2, 2006 at 15:04"}}</div>

@@ -2,7 +2,7 @@
 <html lang="en">
 {{ template "head" .Visual.Title }}
 <body>
-    {{ template "navbar" .Login }}
+    {{ template "back-button" }}
     {{ if .Login }}
     <div class="upload-section">
         <form id="uploadForm" action="/api/v1/visuals/{{ .Visual.ID }}" method="POST" enctype="multipart/form-data">

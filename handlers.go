@@ -44,6 +44,13 @@ func handleGetIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	stories, err := getStories()
+	if err != nil {
+		http.Error(w, "Failed to retrieve stories", http.StatusInternalServerError)
+		log.Printf("Error retrieving stories: %v", err)
+		return
+	}
+
 	const coversDir = "covers"
 	originalPath := filepath.Join(coversDir, filename)
 	largeThumbPath := thumbnailPath(originalPath, "large")
@@ -55,6 +62,7 @@ func handleGetIndex(w http.ResponseWriter, r *http.Request) {
 		LargeCoverPath:    largeThumbPath,
 		MediumCoverPath:   mediumThumbPath,
 		Visuals:           visuals,
+		Stories:           stories,
 	}
 	err = TPL.ExecuteTemplate(w, "index.gohtml", data)
 	if err != nil {
