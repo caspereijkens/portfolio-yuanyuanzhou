@@ -1,0 +1,37 @@
+{{ define "main-content" }}
+<div class="main-container">
+    <div class="left-column">
+        <div class="cover-container">
+            <img src="/fs/{{.MediumCoverPath}}" 
+                 data-large-src="/fs/{{.LargeCoverPath}}" 
+                 alt="Cover image" 
+                 class="cover-image"
+                 onload="this.onload=null; const largeImg = new Image(); largeImg.src=this.dataset.largeSrc; largeImg.onload=() => {this.src=largeImg.src;}">
+        </div>
+        <div class="stories-container">
+            {{ range .Stories -}}
+            <div>
+            <a href="/stories/{{ .ID }}">{{ .CreatedAt.Format "2006 Jan _2"}} - {{.Title}}</a>
+            </div>
+            {{ end -}}
+        </div>
+    </div>
+    <div class="visuals-container">
+        {{ range .Visuals -}}
+        <div class="visual-item">
+            <div class="thumb-grid" data-id="{{ .ID }}"></div>
+            <div class="visual-info">
+                <div class="visual-title">
+                  <p>{{.Title}}</p>
+                </div>
+                <div class="visual-details">
+                    <p>{{.CreatedAt.Year}}</p>
+                    <p>{{.Description}}</p>
+                    <p><a href=/visuals/{{ .ID}}>[View..]</a><p>
+                </div>
+            </div>
+        </div>
+        {{ end -}}
+    </div>
+</div>
+{{ end }}
