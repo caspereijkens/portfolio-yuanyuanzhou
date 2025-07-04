@@ -45,7 +45,8 @@ WORKDIR /app
 COPY --from=build /workspace/bin/web-app /usr/local/bin/web-app
 COPY --from=build /workspace/static ./static/
 COPY --from=build /workspace/data ./data/
-COPY ./bin/main /usr/local/bin/make-thumbnails
+COPY ./bin/make-thumbnails /usr/local/bin/make-thumbnails
+COPY ./bin/cleanup-filepaths /usr/local/bin/cleanup-filepaths
 
 EXPOSE 80
 ENTRYPOINT ["/usr/local/bin/web-app", "--port 80"]

@@ -1,6 +1,6 @@
 # Variables
 IMAGE_NAME = salmonsalmon/portfolio-yuanyuan
-VERSION ?= v0.1.6-alpha  # Default version if not provided
+VERSION ?= v0.1.6  # Default version if not provided
 IMAGE_TAG = $(IMAGE_NAME):$(VERSION)
 LATEST_TAG = $(IMAGE_NAME):latest
 PROXY_COMPOSE_FILE = nginx-proxy-compose.yaml
@@ -59,6 +59,10 @@ reset-app: undeploy-app clean deploy-app
 
 exec:
 	@docker exec -it $$(docker ps -q -f "ancestor=$(IMAGE_TAG)") sh
+
+build-ops-bins:
+	@go build -o bin/cleanup-filepaths  ops/cleanup-filepaths/main.go
+	@go build -o bin/make-thumbnails  ops/make-thumbnails/main.go
 
 # Show help message
 help:
