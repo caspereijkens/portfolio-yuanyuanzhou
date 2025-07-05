@@ -35,13 +35,11 @@
     .visual-title {
         text-align: left;
         font-size: 14px;
-        text-transform: lowercase;
         flex-basis: 33%;
     }
     .visual-details {
         text-align: left;
         font-size: 14px;
-        text-transform: lowercase;
         flex-basis: 67%;
     }
     @media (min-width: 768px) {

@@ -31,10 +31,10 @@ RUN \
     go mod tidy
 RUN \
     GOOS=linux go build -ldflags="-s -w" -o ./bin/web-app ./
-RUN \
-    GOOS=linux go build -ldflags="-s -w" -o ./bin/make-thumbnails ./ops/make-thumbnails/main.go  
-RUN \
-    GOOS=linux go build -ldflags="-s -w" -o ./bin/cleanup-filepaths ./ops/cleanup-filepaths/main.go
+#RUN \
+#    GOOS=linux go build -ldflags="-s -w" -o ./bin/make-thumbnails ./ops/make-thumbnails/main.go  
+#RUN \
+#    GOOS=linux go build -ldflags="-s -w" -o ./bin/cleanup-filepaths ./ops/cleanup-filepaths/main.go
 
 # -----------------------------------------------------------------------------
 #  Main Stage
@@ -48,8 +48,8 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 COPY --from=build /workspace/bin/web-app /usr/local/bin/web-app
-COPY --from=build /workspace/bin/make-thumbnails /usr/local/bin/make-thumbnails
-COPY --from=build /workspace/bin/cleanup-filepaths /usr/local/bin/cleanup-filepaths
+#COPY --from=build /workspace/bin/make-thumbnails /usr/local/bin/make-thumbnails
+#COPY --from=build /workspace/bin/cleanup-filepaths /usr/local/bin/cleanup-filepaths
 COPY --from=build /workspace/static ./static/
 COPY --from=build /workspace/data ./data/
 
