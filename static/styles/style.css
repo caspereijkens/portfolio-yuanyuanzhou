@@ -1,5 +1,4 @@
-
-    .main-container {
+.main-container {
         display: flex;
         flex-direction: column;
         padding: 10px;
@@ -11,8 +10,8 @@
     }
     .cover-container {
         flex: 1 1 100%;
-        padding: 2px;
-        margin: 2px;
+        padding: 0;
+        margin: 0;
     }
     .stories-container {
         flex: 1 1 100%;
@@ -51,10 +50,15 @@
             flex-wrap: nowrap;
         }
         .left-column {
-            flex: 1 1 33%;
+            flex: 1 1 38.2%;
         }
         .visuals-container {
-            flex: 2 1 67%;
+            flex: 2 1 61.8%;
+        }
+        .stories-section {
+            flex-basis: 100%;
+            display: flex;
+            flex-direction: column;
         }
     }
 
@@ -75,7 +79,6 @@
     body {
         display: flex;
         min-height: 100vh;
-        /* Changed from height to min-height */
         flex-direction: column;
         box-sizing: border-box;
         max-width: 1400px;
@@ -83,7 +86,6 @@
         width: 100%;
         padding: 0 0;
         overflow-x: hidden;
-        /* Prevent horizontal scroll */
     }
     
     .upload-section {
@@ -95,7 +97,6 @@
     article {
         max-width: 100%;
         overflow: visible;
-        /* Changed from hidden */
     }
     
     article>div {
@@ -111,18 +112,15 @@
         display: block;
     }
     
-    /* Mobile responsiveness */
     @media (max-width: 768px) {
         body {
             padding: 0 0.5rem;
-            /* Slightly smaller padding on mobile */
         }
     
         article>div {
             grid-template-columns: 1fr;
         }
     
-        /* Ensure touch targets are large enough */
         button {
             padding: 0.8rem 1.2rem;
         }

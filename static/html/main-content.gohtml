@@ -8,13 +8,6 @@
                  class="cover-image"
                  onload="this.onload=null; const largeImg = new Image(); largeImg.src=this.dataset.largeSrc; largeImg.onload=() => {this.src=largeImg.src;}">
         </div>
-        <div class="stories-container">
-            {{ range .Stories -}}
-            <div>
-            <a href="/stories/{{ .ID }}">{{ .CreatedAt.Format "2006 Jan _2"}} - {{.Title}}</a>
-            </div>
-            {{ end -}}
-        </div>
     </div>
     <div class="visuals-container">
         {{ range .Visuals -}}
@@ -32,6 +25,22 @@
             </div>
         </div>
         {{ end -}}
+    </div>
+</div>
+<div class="main-container">
+    <div class="stories-section">
+        <div class="stories-header-container">
+            <h1>Stories</h1>
+        </div>
+        <div class="stories-full-width-container">
+            <div class="stories-container">
+                {{ range .Stories -}}
+                <div>
+                <a href="/stories/{{ .ID }}">{{ .CreatedAt.Format "2006 Jan _2"}} - {{.Title}}</a>
+                </div>
+                {{ end -}}
+            </div>
+        </div>
     </div>
 </div>
 {{ end }}
