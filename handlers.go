@@ -290,8 +290,6 @@ func portfolioHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		handleGetPortfolio(w, r)
-	case http.MethodPost:
-		handlePostPortfolio(w, r)
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -300,13 +298,13 @@ func portfolioHandler(w http.ResponseWriter, r *http.Request) {
 func handleGetPortfolio(w http.ResponseWriter, r *http.Request) {
 	filePath, err := getLatestPortfolioPath()
 	if err != nil {
-		http.Error(w, "Failed to fetch cover data", http.StatusInternalServerError)
+		http.Error(w, "Failed to fetch portfolio data", http.StatusInternalServerError)
 		return
 	}
-	http.ServeFile(w, r, filepath.Join(localFSDir, filePath))
+	http.ServeFile(w, r, filepath.Join(localFSDir, "portfolios", filePath))
 }
 
-func handlePostPortfolio(w http.ResponseWriter, r *http.Request) {
+func portfolioUploadHandler(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseMultipartForm(10 << 20)
 	if err != nil {
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
@@ -342,22 +340,7 @@ func handlePostPortfolio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/portfolio", http.StatusSeeOther)
-}
-
-func portfolioUploadHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
-	handleUploadPortfolio(w, r)
-}
-
-func handleUploadPortfolio(w http.ResponseWriter, r *http.Request) {
-	_, loggedIn := getLoginStatus(r)
-	err = TPL.ExecuteTemplate(w, "portfolio.gohtml", loginData{Login: loggedIn})
-	if err != nil {
-		http.Error(w, "Template error", http.StatusInternalServerError)
-	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func visualsHandler(w http.ResponseWriter, r *http.Request) {
