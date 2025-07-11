@@ -96,13 +96,16 @@ func storeFile(fileHeader *multipart.FileHeader, config FileUploadConfig) (strin
 
 	buffer := make([]byte, 512)
 	if _, err = file.Read(buffer); err != nil {
+		log.Printf("error reading file for MIME type check: %v", err)
 		return "", fmt.Errorf("error reading file for MIME type check: %v", err)
 	}
 	mimeType := http.DetectContentType(buffer)
 	if !config.AllowedTypes[mimeType] {
+		log.Printf("uploaded file type %s is not supported", mimeType)
 		return "", fmt.Errorf("uploaded file type %s is not supported", mimeType)
 	}
 	if _, err = file.Seek(0, 0); err != nil {
+		log.Printf("error resetting file pointer: %v", err)
 		return "", fmt.Errorf("error resetting file pointer: %v", err)
 	}
 
@@ -114,17 +117,21 @@ func storeFile(fileHeader *multipart.FileHeader, config FileUploadConfig) (strin
 
 	if config.DestinationDir != "" {
 		if err := os.MkdirAll(config.DestinationDir, 0755); err != nil {
+			log.Printf("error creating destination directory: %v", err)
 			return "", fmt.Errorf("error creating destination directory: %v", err)
 		}
 	}
 
 	filePath := filepath.Join(config.DestinationDir, filename)
 	if err := saveFile(file, filePath); err != nil {
+		log.Printf("error saving file: %v", err)
 		return "", fmt.Errorf("error saving file: %v", err)
 	}
 
-	if err := generateAndSaveThumbnail(filePath, config); err != nil {
-		log.Printf("Warning: thumbnail generation failed: %v", err)
+	if strings.HasPrefix(mimeType, "image/") {
+		if err := generateAndSaveThumbnail(filePath, config); err != nil {
+			log.Printf("Warning: thumbnail generation failed: %v", err)
+		}
 	}
 
 	return filename, nil
