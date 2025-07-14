@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
         previewObjectUrls.forEach(url => URL.revokeObjectURL(url));
         previewObjectUrls = [];
         processedFilesCache = [];
-        submitBtn.disabled = true;
+        submitBtn.disabled = false; 
         submitBtn.textContent = 'Upload';
         fileCount.textContent = 'No files selected';
         totalSize.textContent = '0 MB';
@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (initialTotalSize > MAX_TOTAL_SIZE * 5) {
             errorMessage.textContent = `Total file size is too large. Please select under ${MAX_TOTAL_SIZE_MB * 5} MB.`;
+            submitBtn.disabled = true; 
             return;
         }
         
@@ -83,7 +84,9 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error processing files:', error);
             errorMessage.textContent = `An error occurred during processing: ${error.message}`;
         } finally {
-            submitBtn.textContent = 'Upload';
+            if (!submitBtn.disabled) {
+               submitBtn.textContent = 'Upload';
+            }
         }
     };
 
@@ -160,10 +163,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const handleFormSubmit = async (e) => {
         e.preventDefault();
         
+        // MODIFICATION: Removed the check that requires files, allowing the form to be submitted without any.
+        /*
         if (processedFilesCache.length === 0) {
             errorMessage.textContent = 'Please select files to upload.';
             return;
         }
+        */
         
         submitBtn.disabled = true;
         uploadProgress.style.display = 'block';
@@ -282,6 +288,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Event Listeners ---
     fileInput.addEventListener('change', handleFileSelection);
     uploadForm.addEventListener('submit', handleFormSubmit);
+
+    // MODIFICATION: Set initial state on page load.
+    resetUI();
 });
 </script>
 <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.3/dist/heic2any.min.js"></script>
