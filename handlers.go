@@ -708,6 +708,32 @@ func handleDeleteVisualPhoto(w http.ResponseWriter, r *http.Request, visualID in
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func uploadFormHandler(w http.ResponseWriter, r *http.Request) {
+	_, loggedIn := getLoginStatus(r)
+	if !loggedIn {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	uploadType := strings.TrimPrefix(r.URL.Path, "/upload/")
+	data := struct {
+		Login bool
+		UploadType string
+		IncludeCompressionScript bool
+		Title string
+	}{
+		Login: loggedIn,
+		UploadType: uploadType,
+		IncludeCompressionScript: uploadType == "cover" || uploadType == "visual",
+		Title: "Upload " + strings.Title(uploadType),
+	}
+
+	err := TPL.ExecuteTemplate(w, "upload-page.gohtml", data)
+	if err != nil {
+		http.Error(w, "error templating page", http.StatusInternalServerError)
+	}
+}
+
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	_, loggedIn := getLoginStatus(r)
 	if !loggedIn {
@@ -715,66 +741,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err := TPL.ExecuteTemplate(w, "upload.gohtml", struct{ Login bool }{Login: loggedIn})
-	if err != nil {
-		http.Error(w, "error templating page", http.StatusInternalServerError)
-	}
-}
-
-func uploadSelectionHandler(w http.ResponseWriter, r *http.Request) {
-	_, loggedIn := getLoginStatus(r)
-	if !loggedIn {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	err := TPL.ExecuteTemplate(w, "upload-selection.gohtml", struct{ Login bool }{Login: loggedIn})
-	if err != nil {
-		http.Error(w, "error templating page", http.StatusInternalServerError)
-	}
-}
-
-func uploadCoverHandler(w http.ResponseWriter, r *http.Request) {
-	_, loggedIn := getLoginStatus(r)
-	if !loggedIn {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	err := TPL.ExecuteTemplate(w, "upload-cover.gohtml", struct{ Login bool }{Login: loggedIn})
-	if err != nil {
-		http.Error(w, "error templating page", http.StatusInternalServerError)
-	}
-}
-
-func uploadPortfolioHandler(w http.ResponseWriter, r *http.Request) {
-	_, loggedIn := getLoginStatus(r)
-	if !loggedIn {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	err := TPL.ExecuteTemplate(w, "upload-portfolio.gohtml", struct{ Login bool }{Login: loggedIn})
-	if err != nil {
-		http.Error(w, "error templating page", http.StatusInternalServerError)
-	}
-}
-
-func uploadVisualHandler(w http.ResponseWriter, r *http.Request) {
-	_, loggedIn := getLoginStatus(r)
-	if !loggedIn {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	err := TPL.ExecuteTemplate(w, "upload-visual.gohtml", struct{ Login bool }{Login: loggedIn})
-	if err != nil {
-		http.Error(w, "error templating page", http.StatusInternalServerError)
-	}
-}
-
-func uploadStoryHandler(w http.ResponseWriter, r *http.Request) {
-	_, loggedIn := getLoginStatus(r)
-	if !loggedIn {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	err := TPL.ExecuteTemplate(w, "upload-story.gohtml", struct{ Login bool }{Login: loggedIn})
 	if err != nil {
 		http.Error(w, "error templating page", http.StatusInternalServerError)
 	}

@@ -1,12 +1,9 @@
-{{ define "upload-portfolio" }}
-<!DOCTYPE html>
-<html lang="en">
-{{ template "head" "Upload Portfolio" }}
-<body>
-    {{ template "navbar" . }}
-    <div class="container">
-        {{ template "portfolio-upload-form" . }}
-    </div>
-</body>
-</html>
-{{ end }}
+{{define "portfolio-upload-form"}}
+<div class="upload-section">
+    <h2>Upload New Portfolio</h2>
+    <form action="/api/v1/portfolios" method="POST" enctype="multipart/form-data">
+        <input type="file" name="portfolio" accept="application/pdf" required>
+        <button type="submit">Upload</button>
+    </form>
+</div>
+{{end}}

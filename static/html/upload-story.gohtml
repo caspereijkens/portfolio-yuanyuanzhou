@@ -1,12 +1,16 @@
-{{ define "upload-story" }}
-<!DOCTYPE html>
-<html lang="en">
-{{ template "head" "Upload Story" }}
-<body>
-    {{ template "navbar" . }}
-    <div class="container">
-        {{ template "story-upload-form" . }}
-    </div>
-</body>
-</html>
-{{ end }}
+{{define "story-upload-form"}}
+<div class="upload-section"> 
+    <h2>Add New Story</h2>
+    <form action="/stories" method="POST">
+        <div>
+            <input type="text" name="title" placeholder="Title" required>
+        </div>
+        <div>
+            <textarea name="content" placeholder="Your story..." required></textarea>
+        </div>
+        <div>
+            <button type="submit">Submit</button>
+        </div>
+    </form>
+</div>
+{{end}}

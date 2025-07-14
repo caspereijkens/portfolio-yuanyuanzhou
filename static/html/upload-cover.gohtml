@@ -1,13 +1,31 @@
-{{ define "upload-cover" }}
-<!DOCTYPE html>
-<html lang="en">
-{{ template "head" "Upload Cover" }}
-<body>
-    {{ template "navbar" . }}
-    <div class="container">
-        {{ template "cover-upload-form" . }}
-    </div>
-    {{ template "browser-image-compression-script" . }}
-</body>
-</html>
-{{ end }}
+{{define "cover-upload-form"}}
+<div class="upload-section">
+    <h2>Upload New Cover</h2>
+    <form id="uploadForm" action="/" method="POST" enctype="multipart/form-data">
+        <div>
+            <label>Select Cover Image:</label>
+            <input 
+                type="file" 
+                id="photos"  
+                name="cover" 
+                accept="image/*,.heic,.heif" 
+                required
+            >
+            <div id="fileInfo">
+                <span id="fileCount">0 files selected</span>
+                <span id="totalSize">0 MB</span>
+            </div>
+            <div id="preview" style="display: flex; gap: 10px; margin-top: 10px;"></div>
+            <div id="uploadProgress" style="display: none;">
+                <progress value="0" max="100"></progress>
+                <span id="progressText">0%</span>
+            </div>
+            <div id="errorMessage" style="color: red;"></div>
+            <small>Max 10MB</small>
+        </div>
+        <div>
+            <button type="submit" id="submitBtn">Upload</button>
+        </div>
+    </form>
+</div>
+{{end}}
