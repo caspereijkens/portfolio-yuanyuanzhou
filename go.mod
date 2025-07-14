@@ -7,6 +7,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.27
 	github.com/satori/go.uuid v1.2.0
 	golang.org/x/crypto v0.37.0
+	golang.org/x/text v0.27.0
 )
 
 require (

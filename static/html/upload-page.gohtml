@@ -1,0 +1,21 @@
+{{template "head" .Title}}
+
+<body>
+    {{ template "back-button" }}
+    <div class="container">
+        {{if eq .UploadType "cover"}}
+            {{template "cover-upload-form" .}}
+        {{else if eq .UploadType "portfolio"}}
+            {{template "portfolio-upload-form" .}}
+        {{else if eq .UploadType "story"}}
+            {{template "story-upload-form" .}}
+        {{else if eq .UploadType "visual"}}
+            {{template "visual-upload-form" .}}
+        {{end}}
+    </div>
+    {{if .IncludeCompressionScript}}
+    {{template "browser-image-compression-script" .}}
+    {{end}}
+</body>
+
+</html>

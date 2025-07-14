@@ -1,0 +1,20 @@
+{{ define "story-upload-form" }}
+{{if .Login}}
+    <h2>Add New Story</h2>
+    <form id="uploadForm" action="/stories" method="POST">
+        <div class="form-group">
+            <label for="title">Title:</label>
+            <input type="text" id="title" name="title" placeholder="Enter story title" required>
+        </div>
+
+        <div class="form-group">
+            <label for="content">Content:</label>
+            <textarea id="content" name="content" placeholder="Write your story here..." required></textarea>
+        </div>
+        
+        <div class="form-group">
+            <button type="submit" id="submitBtn">Submit Story</button>
+        </div>
+    </form>
+{{end}}
+{{ end }}

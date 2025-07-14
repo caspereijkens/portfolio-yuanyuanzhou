@@ -298,12 +298,12 @@ func thumbnailPath(photoPath, size string) string {
 }
 
 func generateThumbnailPaths(originalRelativePath string) thumbnailPaths {
-    return thumbnailPaths{
-        Mini:   "/fs/" + thumbnailPath(originalRelativePath, "mini"),
-        Small:  "/fs/" + thumbnailPath(originalRelativePath, "small"),
-        Medium: "/fs/" + thumbnailPath(originalRelativePath, "medium"),
-        Large:  "/fs/" + thumbnailPath(originalRelativePath, "large"),
-    }
+	return thumbnailPaths{
+		Mini:   "/fs/" + thumbnailPath(originalRelativePath, "mini"),
+		Small:  "/fs/" + thumbnailPath(originalRelativePath, "small"),
+		Medium: "/fs/" + thumbnailPath(originalRelativePath, "medium"),
+		Large:  "/fs/" + thumbnailPath(originalRelativePath, "large"),
+	}
 }
 
 func respondWithJSON(w http.ResponseWriter, statusCode int, payload interface{}) {

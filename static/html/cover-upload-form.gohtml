@@ -1,5 +1,5 @@
-{{define "cover-upload-form"}}
-<div class="upload-section">
+{{ define "cover-upload-form" }}
+{{if .Login}}
     <h2>Upload New Cover</h2>
     <form id="uploadForm" action="/" method="POST" enctype="multipart/form-data">
         <div>
@@ -27,5 +27,5 @@
             <button type="submit" id="submitBtn">Upload</button>
         </div>
     </form>
-</div>
 {{end}}
+{{ end }}

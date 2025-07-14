@@ -1,0 +1,21 @@
+{{ define "portfolio-upload-form" }}
+{{if .Login}}
+    <h2>Upload New Portfolio (PDF)</h2>
+    <form id="uploadForm" action="/api/v1/portfolios" method="POST" enctype="multipart/form-data">
+        <div>
+            <label>Select Portfolio PDF:</label>
+            <input 
+                type="file" 
+                id="portfolio"  
+                name="portfolio" 
+                accept="application/pdf" 
+                required
+            >
+            <small>Max 10MB</small>
+        </div>
+        <div>
+            <button type="submit" id="submitBtn">Upload Portfolio</button>
+        </div>
+    </form>
+{{end}}
+{{ end }}

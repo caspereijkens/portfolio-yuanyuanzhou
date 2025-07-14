@@ -6,9 +6,13 @@
         display: flex;
         flex-direction: column;
     }
-    .cover-container {
-        flex: 1 1 100%;
-    }
+.cover-container {
+    display: flex;
+    justify-content: center;
+    /* Change 'center' to 'flex-start' to align the image to the top */
+    align-items: flex-start; 
+    margin: 1rem 0;
+}
     .stories-container {
         flex: 1 1 100%;
         padding: 10px;

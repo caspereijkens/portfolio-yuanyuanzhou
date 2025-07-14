@@ -1,6 +1,9 @@
 {{ define "navbar" }}
 <div class="sticky-banner">
     <a href="/info">[Info]</a>
+    {{if .Login}}
+    <a href="/upload" class="upload-button">[Upload]</a>
+    {{end}}
     <a href="/portfolio">[Download portfolio]</a>
 </div>
 {{ end }}

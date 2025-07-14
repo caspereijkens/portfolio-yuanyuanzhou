@@ -11,7 +11,5 @@ Performant and secure multiplexer to serve an artist portfolio.
 ## TODO
 - Improve this readme
 - Fix hovering on touch screen
-- Patching Visual requires an image
 - Uploading images on macbook does not Workflow
-- Text is turned lower case.
 - Text (title etc) is confusing

@@ -48,6 +48,8 @@ func main() {
 	mux.HandleFunc("/visuals/", methodOverride(requireAuthUnlessGet(visualsHandler)))
 	mux.HandleFunc("/visuals", requireAuthUnlessGet(listVisualsHandler))
 	mux.HandleFunc("/info", methodOverride(requireAuthUnlessGet(infoHandler)))
+	mux.HandleFunc("/upload/", requireAuth(uploadFormHandler))
+	mux.HandleFunc("/upload", requireAuth(uploadHandler))
 	mux.HandleFunc("/login", loginHandler)
 	mux.HandleFunc("/logout", requireAuthUnlessGet(logoutHandler))
 	mux.HandleFunc("/portfolio", requireAuthUnlessGet(portfolioHandler))

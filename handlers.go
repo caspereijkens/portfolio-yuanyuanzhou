@@ -3,6 +3,8 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"log"
 	"net/http"
 	"os"
@@ -706,6 +708,36 @@ func handleDeleteVisualPhoto(w http.ResponseWriter, r *http.Request, visualID in
 
 	log.Printf("Successfully deleted photo with id '%d' from visual '%d'", photoID, visualID)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func uploadFormHandler(w http.ResponseWriter, r *http.Request) {
+	_, loggedIn := getLoginStatus(r)
+
+	uploadType := strings.TrimPrefix(r.URL.Path, "/upload/")
+	data := struct {
+		Login                    bool
+		UploadType               string
+		IncludeCompressionScript bool
+		Title                    string
+	}{
+		Login:                    loggedIn,
+		UploadType:               uploadType,
+		IncludeCompressionScript: uploadType == "cover" || uploadType == "visual",
+		Title:                    "Upload " + cases.Title(language.English).String(uploadType),
+	}
+
+	err := TPL.ExecuteTemplate(w, "upload-page.gohtml", data)
+	if err != nil {
+		http.Error(w, "error templating page", http.StatusInternalServerError)
+	}
+}
+
+func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	_, loggedIn := getLoginStatus(r)
+	err := TPL.ExecuteTemplate(w, "upload.gohtml", struct{ Login bool }{Login: loggedIn})
+	if err != nil {
+		http.Error(w, "error templating page", http.StatusInternalServerError)
+	}
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {

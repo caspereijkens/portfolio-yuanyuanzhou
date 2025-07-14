@@ -3,11 +3,6 @@
 {{ template "head" "Yuanyuan Zhou" }}
 <body>
     {{ template "main-content" .}}
-    {{if .Login}}
-    {{ template "upload-section" . }}
-    {{ template "browser-image-compression-script" }}
-    {{end}}
-    {{ template "thumbnail-loading-script" }}
     {{ template "navbar" . }}
 </body>
 </html>
