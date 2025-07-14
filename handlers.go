@@ -3,6 +3,8 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"log"
 	"net/http"
 	"os"
@@ -710,22 +712,18 @@ func handleDeleteVisualPhoto(w http.ResponseWriter, r *http.Request, visualID in
 
 func uploadFormHandler(w http.ResponseWriter, r *http.Request) {
 	_, loggedIn := getLoginStatus(r)
-	if !loggedIn {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
 
 	uploadType := strings.TrimPrefix(r.URL.Path, "/upload/")
 	data := struct {
-		Login bool
-		UploadType string
+		Login                    bool
+		UploadType               string
 		IncludeCompressionScript bool
-		Title string
+		Title                    string
 	}{
-		Login: loggedIn,
-		UploadType: uploadType,
+		Login:                    loggedIn,
+		UploadType:               uploadType,
 		IncludeCompressionScript: uploadType == "cover" || uploadType == "visual",
-		Title: "Upload " + strings.Title(uploadType),
+		Title:                    "Upload " + cases.Title(language.English).String(uploadType),
 	}
 
 	err := TPL.ExecuteTemplate(w, "upload-page.gohtml", data)
@@ -736,10 +734,6 @@ func uploadFormHandler(w http.ResponseWriter, r *http.Request) {
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	_, loggedIn := getLoginStatus(r)
-	if !loggedIn {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
 	err := TPL.ExecuteTemplate(w, "upload.gohtml", struct{ Login bool }{Login: loggedIn})
 	if err != nil {
 		http.Error(w, "error templating page", http.StatusInternalServerError)
