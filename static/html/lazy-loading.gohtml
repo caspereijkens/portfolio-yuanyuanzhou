@@ -105,8 +105,7 @@
             const photoID = button.getAttribute('data-photo-id');
 
             try {
-                // NOTE: Make sure you have a DELETE /photos/:id endpoint
-                const response = await fetch(`/photos/${photoID}`, { method: 'DELETE' });
+              const response = await fetch(`/api/v1/visuals/${visualID}/photos/${photoID}`, { method: 'DELETE' });
                 if (response.ok) {
                     form.closest('.photo-item')?.remove();
                     requestAnimationFrame(checkViewportFill);
